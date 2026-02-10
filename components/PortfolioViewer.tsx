@@ -25,13 +25,26 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
   const accentColor = data?.theme?.accentColor || '#a855f7';
   const isLight = data?.theme?.mode === 'light';
 
+  // Helper to convert Hex to RGB for Shadows
+  const hexToRgb = (hex: string) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '99, 102, 241';
+  };
+  const primaryRgb = hexToRgb(primaryColor);
+
   // Dynamic Theme Classes
   const textPrimary = isLight ? 'text-slate-900' : 'text-white';
   const textSecondary = isLight ? 'text-slate-600' : 'text-slate-400';
   const textMuted = isLight ? 'text-slate-500' : 'text-slate-500';
-  const cardBg = isLight 
-    ? 'bg-white/40 border-slate-900/5 hover:border-slate-900/20 shadow-sm' 
-    : 'bg-white/5 border-white/5 hover:border-white/20';
+  
+  // Custom Card Style with Colored Shadow
+  const cardStyle = {
+    backgroundColor: isLight ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.03)',
+    borderColor: isLight ? `rgba(${primaryRgb}, 0.1)` : `rgba(${primaryRgb}, 0.2)`,
+    boxShadow: `0 10px 40px -10px rgba(${primaryRgb}, ${isLight ? 0.2 : 0.25})`,
+    backdropFilter: 'blur(10px)'
+  };
+
   const navText = isLight ? 'text-slate-400 group-hover:text-slate-900' : 'text-slate-500 group-hover:text-white';
   const navTextActive = isLight ? 'text-slate-900' : 'text-white';
   
@@ -95,7 +108,7 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
         viewport={{ once: true, margin: "-100px" }}
         className="flex flex-col items-center"
       >
-        <div className="h-1 w-12 mb-6 rounded-full" style={{ backgroundColor: color || '#6366f1' }}></div>
+        <div className="h-1 w-12 mb-6 rounded-full" style={{ backgroundColor: color || '#6366f1', boxShadow: `0 0 15px ${color}` }}></div>
         <h2 
           className={`text-5xl md:text-7xl font-bold font-heading mb-4 tracking-tight uppercase ${textPrimary}`}
           style={{ color: isLight ? undefined : '#fff' }}
@@ -135,7 +148,8 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
              <div className="w-1.5 h-1.5 rounded-full border transition-all duration-300" style={{ 
                backgroundColor: activeTab === id ? primaryColor : 'transparent',
                borderColor: activeTab === id ? primaryColor : (isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'),
-               transform: activeTab === id ? 'scale(1.5)' : 'scale(1)'
+               transform: activeTab === id ? 'scale(1.5)' : 'scale(1)',
+               boxShadow: activeTab === id ? `0 0 10px ${primaryColor}` : 'none'
              }}></div>
           </a>
         ))}
@@ -174,7 +188,7 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
                 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
                 className="text-6xl md:text-9xl font-bold tracking-tight uppercase"
               >
-                {firstName} <span style={{ color: primaryColor }}>{lastName}</span>
+                {firstName} <span style={{ color: primaryColor, textShadow: `0 0 40px rgba(${primaryRgb}, 0.3)` }}>{lastName}</span>
               </motion.h1>
 
               <motion.p 
@@ -205,7 +219,8 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
           <SectionTitle subtitle="Overview" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>About</SectionTitle>
           <motion.div 
             initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
-            className={`${cardBg} rounded-[40px] p-10 md:p-20 border relative overflow-hidden`}
+            className={`rounded-[40px] p-10 md:p-20 border relative overflow-hidden`}
+            style={cardStyle}
           >
             <p className={`text-2xl md:text-4xl font-medium leading-snug tracking-tight ${textPrimary}`}>
               {data.summary}
@@ -221,7 +236,8 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
               <motion.div
                 key={i}
                 initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim} transition={{ delay: i * 0.05 }}
-                className={`${cardBg} rounded-2xl border p-6 text-center transition-colors ${isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'}`}
+                className={`rounded-2xl border p-6 text-center transition-all hover:scale-105`}
+                style={cardStyle}
               >
                 <span className={`text-[11px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{skill}</span>
               </motion.div>
@@ -237,7 +253,8 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
               <motion.div 
                 key={i} 
                 initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
-                className={`${cardBg} p-10 md:p-14 rounded-[32px] border transition-all`}
+                className={`p-10 md:p-14 rounded-[32px] border transition-all`}
+                style={cardStyle}
               >
                 <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
                   <div>
@@ -264,7 +281,8 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
               <motion.div 
                 key={i} 
                 initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
-                className={`${cardBg} rounded-[32px] overflow-hidden border transition-all flex flex-col h-full`}
+                className={`rounded-[32px] overflow-hidden border transition-all flex flex-col h-full`}
+                style={cardStyle}
               >
                 <div className="p-10 flex flex-col flex-1">
                   <h3 className={`text-3xl font-bold mb-6 ${textPrimary}`}>{proj.title}</h3>
@@ -292,7 +310,8 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
               <motion.div 
                 key={i} 
                 initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
-                className={`${cardBg} p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6`}
+                className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6`}
+                style={cardStyle}
               >
                 <div className="text-center md:text-left">
                   <h3 className={`text-xl font-bold ${textPrimary}`}>{edu.degree}</h3>
@@ -313,14 +332,16 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
             initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
             className="text-center space-y-16 w-full"
           >
-            <a href={`mailto:${data.email}`} className={`text-3xl md:text-6xl font-bold hover:text-indigo-400 transition-colors lowercase tracking-tight block ${textPrimary}`}>
+            <a href={`mailto:${data.email}`} className={`text-3xl md:text-6xl font-bold hover:text-indigo-400 transition-colors lowercase tracking-tight block ${textPrimary}`} style={{ textShadow: `0 0 20px rgba(${primaryRgb}, 0.2)` }}>
               {data.email}
             </a>
 
             <div className="flex flex-wrap justify-center gap-6 md:gap-12">
               {data.socialLinks?.linkedin && (
                 <a href={data.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 group">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-[#0077b5] group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-[#0077b5]'}`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-[#0077b5] group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-[#0077b5]'}`}
+                       style={{ borderColor: `rgba(${primaryRgb}, 0.2)` }}
+                  >
                     <i className="fab fa-linkedin-in text-xl"></i>
                   </div>
                   <span className={`text-[9px] font-bold uppercase tracking-widest group-hover:text-inherit ${textMuted}`}>LinkedIn</span>
@@ -328,7 +349,9 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
               )}
               {data.socialLinks?.github && (
                 <a href={data.socialLinks.github} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 group">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-slate-900 group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-white group-hover:text-black'}`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-slate-900 group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-white group-hover:text-black'}`}
+                       style={{ borderColor: `rgba(${primaryRgb}, 0.2)` }}
+                  >
                     <i className="fab fa-github text-xl"></i>
                   </div>
                   <span className={`text-[9px] font-bold uppercase tracking-widest group-hover:text-inherit ${textMuted}`}>GitHub</span>
@@ -336,7 +359,9 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
               )}
               {data.socialLinks?.twitter && (
                 <a href={data.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 group">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-[#1DA1F2] group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-[#1DA1F2]'}`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-[#1DA1F2] group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-[#1DA1F2]'}`}
+                       style={{ borderColor: `rgba(${primaryRgb}, 0.2)` }}
+                  >
                     <i className="fab fa-twitter text-xl"></i>
                   </div>
                   <span className={`text-[9px] font-bold uppercase tracking-widest group-hover:text-inherit ${textMuted}`}>Twitter</span>

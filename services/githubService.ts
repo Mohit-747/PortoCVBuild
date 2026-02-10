@@ -240,7 +240,7 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                     viewport={{ once: true, margin: "-100px" }}
                     className="flex flex-col items-center"
                 >
-                    <div className="h-1 w-12 mb-6 rounded-full" style={{ backgroundColor: color || '#6366f1' }}></div>
+                    <div className="h-1 w-12 mb-6 rounded-full" style={{ backgroundColor: color || '#6366f1', boxShadow: \`0 0 15px \${color}\` }}></div>
                     <h2 className={\`text-4xl md:text-7xl font-bold font-heading mb-4 tracking-tight uppercase \${textPrimary}\`} style={{ color: isLight ? undefined : '#fff' }}>
                         {children}
                     </h2>
@@ -262,15 +262,26 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
             const animStyle = data?.theme?.animationStyle || 'fade';
             const isLight = data?.theme?.mode === 'light';
 
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\\d]{2})([a-f\\d]{2})([a-f\\d]{2})$/i.exec(hex);
+                return result ? \`\${parseInt(result[1], 16)}, \${parseInt(result[2], 16)}, \${parseInt(result[3], 16)}\` : '99, 102, 241';
+            };
+            const primaryRgb = hexToRgb(primaryColor);
+
             // Dynamic Theme Classes
             const textPrimary = isLight ? 'text-slate-900' : 'text-white';
             const textSecondary = isLight ? 'text-slate-600' : 'text-slate-400';
             const textMuted = isLight ? 'text-slate-500' : 'text-slate-500';
-            const cardBg = isLight 
-                ? 'bg-white/40 border-slate-900/5 hover:border-slate-900/20 shadow-sm' 
-                : 'bg-white/5 border-white/5 hover:border-white/20';
             const navText = isLight ? 'text-slate-400 group-hover:text-slate-900' : 'text-slate-500 group-hover:text-white';
             const navTextActive = isLight ? 'text-slate-900' : 'text-white';
+
+            // Custom Card Style with Colored Shadow
+            const cardStyle = {
+                backgroundColor: isLight ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.03)',
+                borderColor: isLight ? \`rgba(\${primaryRgb}, 0.1)\` : \`rgba(\${primaryRgb}, 0.2)\`,
+                boxShadow: \`0 10px 40px -10px rgba(\${primaryRgb}, \${isLight ? 0.2 : 0.25})\`,
+                backdropFilter: 'blur(10px)'
+            };
 
             const fadeInUp = { hidden: { opacity: 0, y: 60 }, visible: { opacity: 1, y: 0, transition: { duration: 0.8 } } };
             const slideIn = { hidden: { opacity: 0, x: -100 }, visible: { opacity: 1, x: 0, transition: { duration: 0.6, type: "spring" } } };
@@ -299,7 +310,12 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                         {['hero', 'about', 'skills', 'experience', 'projects', 'education', 'contact'].map((id) => (
                             <a key={id} href={\`#\${id}\`} className="group flex items-center justify-end gap-4 text-decoration-none">
                                 <span className={\`text-[9px] font-bold uppercase tracking-[0.3em] transition-all duration-300 \${activeTab === id ? \`opacity-100 \${navTextActive}\` : \`opacity-0 \${navText}\`}\`}>{id}</span>
-                                <div className="w-1.5 h-1.5 rounded-full border border-white/20 transition-all duration-300" style={{ backgroundColor: activeTab === id ? primaryColor : 'transparent', borderColor: activeTab === id ? primaryColor : (isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'), transform: activeTab === id ? 'scale(1.5)' : 'scale(1)' }}></div>
+                                <div className="w-1.5 h-1.5 rounded-full border border-white/20 transition-all duration-300" style={{ 
+                                    backgroundColor: activeTab === id ? primaryColor : 'transparent', 
+                                    borderColor: activeTab === id ? primaryColor : (isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'), 
+                                    transform: activeTab === id ? 'scale(1.5)' : 'scale(1)',
+                                    boxShadow: activeTab === id ? \`0 0 10px \${primaryColor}\` : 'none'
+                                }}></div>
                             </a>
                         ))}
                     </nav>
@@ -318,7 +334,7 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                                         {data.location || 'Global'}
                                     </motion.div>
                                     <motion.h1 initial="hidden" animate="visible" variants={anim} transition={{delay:0.2}} className="text-5xl md:text-8xl lg:text-9xl font-bold tracking-tight uppercase leading-none">
-                                        {data.name.split(' ')[0]} <span style={{ color: primaryColor }}>{data.name.split(' ').slice(1).join(' ')}</span>
+                                        {data.name.split(' ')[0]} <span style={{ color: primaryColor, textShadow: \`0 0 40px rgba(\${primaryRgb}, 0.3)\` }}>{data.name.split(' ').slice(1).join(' ')}</span>
                                     </motion.h1>
                                     <motion.p initial="hidden" animate="visible" variants={anim} transition={{delay:0.4}} className={\`text-xl md:text-3xl font-medium mt-8 max-w-3xl mx-auto leading-relaxed \${textSecondary}\`}>
                                         {data.title}
@@ -334,7 +350,7 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
 
                         <section id="about" className="py-24 md:py-32 scroll-mt-20">
                             <SectionTitle subtitle="Overview" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>About</SectionTitle>
-                            <motion.div initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`\${cardBg} rounded-[40px] p-8 md:p-20 border relative overflow-hidden\`}>
+                            <motion.div initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`rounded-[40px] p-8 md:p-20 border relative overflow-hidden\`} style={cardStyle}>
                                 <p className={\`text-xl md:text-4xl font-medium leading-snug tracking-tight \${textPrimary}\`}>{data.summary}</p>
                             </motion.div>
                         </section>
@@ -343,7 +359,7 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                             <SectionTitle subtitle="Competencies" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Skills</SectionTitle>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
                                 {displaySkills.map((skill, i) => (
-                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} transition={{delay: i*0.05}} className={\`\${cardBg} rounded-2xl border p-6 text-center transition-colors \${isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'}\`}>
+                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} transition={{delay: i*0.05}} className={\`rounded-2xl border p-6 text-center transition-all hover:scale-105\`} style={cardStyle}>
                                         <span className={\`text-[10px] md:text-[11px] font-bold uppercase tracking-widest \${isLight ? 'text-slate-600' : 'text-slate-300'}\`}>{skill}</span>
                                     </motion.div>
                                 ))}
@@ -354,7 +370,7 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                             <SectionTitle subtitle="Trajectory" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Experience</SectionTitle>
                             <div className="space-y-8 md:space-y-12">
                                 {data.experience.map((exp, i) => (
-                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`\${cardBg} p-8 md:p-14 rounded-[32px] border transition-all\`}>
+                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`p-8 md:p-14 rounded-[32px] border transition-all\`} style={cardStyle}>
                                         <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
                                             <div><h3 className={\`text-2xl md:text-3xl font-bold mb-2 \${textPrimary}\`}>{exp.role}</h3><p className="text-sm md:text-lg font-bold uppercase tracking-widest" style={{ color: primaryColor }}>{exp.company}</p></div>
                                             <div className={\`\${textMuted} font-bold text-xs uppercase tracking-widest pt-2 whitespace-nowrap\`}>{exp.period}</div>
@@ -369,7 +385,7 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                             <SectionTitle subtitle="Impact" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Projects</SectionTitle>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
                                 {data.projects.map((proj, i) => (
-                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`\${cardBg} rounded-[32px] overflow-hidden border transition-all flex flex-col h-full\`}>
+                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`rounded-[32px] overflow-hidden border transition-all flex flex-col h-full\`} style={cardStyle}>
                                         <div className="p-8 md:p-10 flex flex-col flex-1">
                                             <h3 className={\`text-2xl md:text-3xl font-bold mb-6 \${textPrimary}\`}>{proj.title}</h3>
                                             <p className={\`\${textSecondary} text-base md:text-lg leading-relaxed mb-8\`}>{proj.description}</p>
@@ -384,7 +400,7 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                             <SectionTitle subtitle="Academics" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Education</SectionTitle>
                             <div className="max-w-4xl mx-auto space-y-6">
                                 {data.education.map((edu, i) => (
-                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`\${cardBg} p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6\`}>
+                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6\`} style={cardStyle}>
                                         <div className="text-center md:text-left"><h3 className={\`text-lg md:text-xl font-bold \${textPrimary}\`}>{edu.degree}</h3><p className={\`\${textMuted} font-semibold uppercase tracking-widest text-xs mt-1\`}>{edu.institution}</p></div>
                                         <div className={\`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest border whitespace-nowrap \${isLight ? 'bg-slate-900/5 text-slate-500 border-slate-900/5' : 'bg-white/5 text-slate-400 border-white/5'}\`}>{edu.year}</div>
                                     </motion.div>
@@ -395,11 +411,11 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                         <section id="contact" className="py-32 md:py-40 flex flex-col items-center justify-center scroll-mt-20">
                             <SectionTitle subtitle="Network" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Contact</SectionTitle>
                             <div className="text-center space-y-16 w-full">
-                                <a href={\`mailto:\${data.email}\`} className={\`text-3xl md:text-6xl font-bold hover:text-indigo-400 transition-colors lowercase tracking-tight block break-all \${textPrimary}\`}>{data.email}</a>
+                                <a href={\`mailto:\${data.email}\`} className={\`text-3xl md:text-6xl font-bold hover:text-indigo-400 transition-colors lowercase tracking-tight block break-all \${textPrimary}\`} style={{ textShadow: \`0 0 20px rgba(\${primaryRgb}, 0.2)\` }}>{data.email}</a>
                                 <div className="flex flex-wrap justify-center gap-8 md:gap-12">
-                                    {data.socialLinks?.linkedin && <a href={data.socialLinks.linkedin} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><i className="fab fa-linkedin-in text-2xl"></i><span className="text-[9px] uppercase tracking-widest">LinkedIn</span></a>}
-                                    {data.socialLinks?.github && <a href={data.socialLinks.github} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><i className="fab fa-github text-2xl"></i><span className="text-[9px] uppercase tracking-widest">GitHub</span></a>}
-                                    {data.socialLinks?.twitter && <a href={data.socialLinks.twitter} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><i className="fab fa-twitter text-2xl"></i><span className="text-[9px] uppercase tracking-widest">X / Twitter</span></a>}
+                                    {data.socialLinks?.linkedin && <a href={data.socialLinks.linkedin} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><div style={{ borderColor: \`rgba(\${primaryRgb}, 0.2)\` }} className="w-12 h-12 rounded-full border flex items-center justify-center"><i className="fab fa-linkedin-in text-xl"></i></div><span className="text-[9px] uppercase tracking-widest">LinkedIn</span></a>}
+                                    {data.socialLinks?.github && <a href={data.socialLinks.github} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><div style={{ borderColor: \`rgba(\${primaryRgb}, 0.2)\` }} className="w-12 h-12 rounded-full border flex items-center justify-center"><i className="fab fa-github text-xl"></i></div><span className="text-[9px] uppercase tracking-widest">GitHub</span></a>}
+                                    {data.socialLinks?.twitter && <a href={data.socialLinks.twitter} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><div style={{ borderColor: \`rgba(\${primaryRgb}, 0.2)\` }} className="w-12 h-12 rounded-full border flex items-center justify-center"><i className="fab fa-twitter text-xl"></i></div><span className="text-[9px] uppercase tracking-widest">X / Twitter</span></a>}
                                 </div>
                             </div>
                         </section>
