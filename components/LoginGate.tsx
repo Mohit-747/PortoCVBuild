@@ -36,8 +36,8 @@ export const LoginGate: React.FC<Props> = ({ onLogin }) => {
   }, [tokenExpiry, isExpired]);
 
   const generateNewToken = () => {
-    // Generate random 6 digits
-    const token = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate random 4 digits (easier to read/calculate than 6)
+    const token = Math.floor(1000 + Math.random() * 9000).toString();
     setChallengeToken(token);
     setOtpInput('');
     setError('');
@@ -48,6 +48,7 @@ export const LoginGate: React.FC<Props> = ({ onLogin }) => {
   const deriveExpectedOTP = (token: string) => {
     // CIPHER LOGIC: SHIFT + 1
     // 0 -> 1, 1 -> 2, ... 9 -> 0
+    // Example: 1357 -> 2468
     return token.split('').map(char => (parseInt(char) + 1) % 10).join('');
   };
 
@@ -203,7 +204,7 @@ export const LoginGate: React.FC<Props> = ({ onLogin }) => {
                       value={otpInput}
                       onChange={(e) => setOtpInput(e.target.value)}
                       placeholder="______"
-                      maxLength={6}
+                      maxLength={4}
                       className="w-full bg-slate-900/50 border border-white/10 rounded-2xl py-3.5 pl-12 pr-4 text-white placeholder-slate-600 focus:border-indigo-500 focus:bg-slate-900 outline-none transition-all font-bold tracking-[0.5em] text-sm text-center"
                     />
                  </div>

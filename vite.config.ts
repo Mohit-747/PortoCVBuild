@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
-    // Safely inject the API key, defaulting to empty string if missing during build
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || 'AIzaSyBlXrNywkVoxJRUD6g7wNpywmT4KcJsXuc')
+    // Injects the API_KEY from Vercel Environment Variables at build time
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY || '')
   }
 });
