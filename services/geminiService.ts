@@ -2,24 +2,27 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { PortfolioData, QAFeedback, UserPreferences, UKResumeData } from "../types";
 
-// --- API KEY ROTATION LOGIC ---
+// --- API KEY ROTATION & SANITIZATION LOGIC ---
 
-// 1. ADD YOUR BACKUP KEYS HERE
-// The system will try them in order. If Key 1 fails (Quota Limit), it switches to Key 2, etc.
+// Helper to clean keys (remove whitespace, quotes added by some env managers)
+const sanitizeKey = (key: string | undefined) => {
+    if (!key) return '';
+    return key.trim().replace(/^["']|["']$/g, '');
+};
+
 const API_KEY_POOL = [
-  process.env.API_KEY, // Primary Key from Environment
-  // "AIzaSy...PasteYourSecondKeyHere",
-  // "AIzaSy...PasteYourThirdKeyHere",
-].filter((k): k is string => !!k && k !== 'undefined' && k.length > 10 && !k.startsWith("AIzaSy...Paste"));
+  sanitizeKey(process.env.API_KEY), 
+  // Add backup keys here if needed
+].filter((k): k is string => !!k && k.length > 10 && !k.startsWith("AIzaSy...Paste"));
 
 let currentKeyIndex = 0;
 
 const getCurrentApiKey = () => {
   if (API_KEY_POOL.length === 0) {
-    throw new Error("No valid API Keys found. Please check services/geminiService.ts");
+    throw new Error("No valid API Keys found in environment. Please check Vercel settings.");
   }
   if (currentKeyIndex >= API_KEY_POOL.length) {
-    throw new Error("ALL_KEYS_EXHAUSTED");
+    throw new Error("ALL_KEYS_EXHAUSTED: Daily quota reached for all provided keys.");
   }
   return API_KEY_POOL[currentKeyIndex];
 };
@@ -34,14 +37,21 @@ const rotateKey = () => {
   return false; // No more keys
 };
 
+// Safety Settings to prevent false positives on Resume content
+const SAFETY_SETTINGS = [
+    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+];
+
 // Generic wrapper for all AI calls to handle failover
 async function callWithRetry<T>(fn: (ai: GoogleGenAI) => Promise<T>, retries = 1, delay = 1000): Promise<T> {
   try {
-    // Always instantiate with the CURRENT active key
     const ai = new GoogleGenAI({ apiKey: getCurrentApiKey() });
     return await fn(ai);
   } catch (error: any) {
-    // Check for Quota Exceeded (429)
+    // 1. Check for Quota Exceeded (429)
     const isQuotaError = error.status === 429 || 
                          (error.message && error.message.includes('429')) ||
                          (error.message && error.message.toLowerCase().includes('quota')) ||
@@ -49,14 +59,18 @@ async function callWithRetry<T>(fn: (ai: GoogleGenAI) => Promise<T>, retries = 1
 
     if (isQuotaError) {
       if (rotateKey()) {
-        // Retry immediately with new key (no delay needed for rotation)
         return callWithRetry(fn, retries, 0);
       } else {
-        throw new Error("⚠️ All API Keys are exhausted. Please try again tomorrow or add more keys.");
+        throw new Error("429 Resource Exhausted: Your API Key quota is full.");
       }
     }
 
-    // Standard exponential backoff for other transient errors (500, 503)
+    // 2. Check for Invalid Key (400)
+    if (error.status === 400 || (error.message && error.message.includes('API key not valid'))) {
+         throw new Error("400 Invalid API Key: Please check your Vercel Environment Variables.");
+    }
+
+    // 3. Standard exponential backoff for server errors
     if (retries > 0 && (error.status === 500 || error.message?.includes('500') || error.message?.includes('fetch failed'))) {
       await new Promise(resolve => setTimeout(resolve, delay));
       return callWithRetry(fn, retries - 1, delay * 2);
@@ -124,6 +138,7 @@ OUTPUT: Strict JSON only.` }
       config: {
         temperature: 0.95,
         responseMimeType: "application/json",
+        safetySettings: SAFETY_SETTINGS,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -203,7 +218,7 @@ OUTPUT: Strict JSON only.` }
       }
     });
 
-    if (!response.text) throw new Error("Agent 1 failed to construct blueprint.");
+    if (!response.text) throw new Error("Agent 1 failed to construct blueprint (Empty Response).");
     return JSON.parse(response.text) as PortfolioData;
   });
 };
@@ -224,6 +239,7 @@ export const modifyPortfolio = async (
       `,
       config: {
         responseMimeType: "application/json",
+        safetySettings: SAFETY_SETTINGS,
       }
     });
 
@@ -240,6 +256,7 @@ export const getAgentFeedback = async (data: PortfolioData): Promise<QAFeedback>
       contents: `Critique this portfolio build. Data: ${JSON.stringify(data).slice(0, 4000)}`,
       config: {
         responseMimeType: "application/json",
+        safetySettings: SAFETY_SETTINGS,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -298,6 +315,7 @@ export const generateUKResume = async (
       config: {
         temperature: 0.65,
         responseMimeType: "application/json",
+        safetySettings: SAFETY_SETTINGS,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -386,6 +404,7 @@ export const tailorResumeToJob = async (
       contents: prompt,
       config: {
         responseMimeType: "application/json",
+        safetySettings: SAFETY_SETTINGS,
       }
     });
 

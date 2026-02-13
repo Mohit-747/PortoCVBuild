@@ -178,9 +178,10 @@ const App: React.FC = () => {
       
       setPortfolio(data);
       setTimeout(() => setStep(AppStep.PREVIEW), 500);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Neural generation failed. Please try a different resume or refresh.");
+      // DISPLAY THE SPECIFIC ERROR FROM SERVICE
+      alert(`Generation Failed: ${error.message || "Unknown neural error"}`);
       setStep(AppStep.INPUT);
     }
   };
@@ -193,8 +194,8 @@ const App: React.FC = () => {
       updatedData.photoUrl = updatedData.photoUrl || portfolio.photoUrl; 
       setPortfolio(updatedData);
       setEditPrompt('');
-    } catch (e) {
-      alert("Edit failed. Please try rephrasing.");
+    } catch (e: any) {
+      alert(`Edit failed: ${e.message}`);
     } finally {
       setIsEditing(false);
     }
