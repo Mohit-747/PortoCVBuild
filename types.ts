@@ -131,3 +131,5 @@ export enum AppStep {
   DEPLOYING = 'DEPLOYING',
   SUCCESS = 'SUCCESS'
 }
+
+export type ProgressCallback = (step: string) => void;

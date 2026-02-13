@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 // @ts-ignore
 import mammoth from 'mammoth';
 import { AppStep, PortfolioData, QAFeedback, PortfolioHistoryItem, UserPreferences, AppMode, UKResumeData } from './types';
-import { generatePortfolioData, getAgentFeedback, modifyPortfolio } from './services/geminiService';
+import { generatePortfolioData, getAgentFeedback, modifyPortfolio, setManualApiKey } from './services/geminiService';
 import { deployToGitHub } from './services/githubService';
 import { ThreeBackground } from './components/ThreeBackground';
 import { PortfolioViewer } from './components/PortfolioViewer';
@@ -52,6 +52,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<PortfolioHistoryItem[]>([]);
   const [githubToken, setGithubToken] = useState('');
   const [deployedUrl, setDeployedUrl] = useState('');
+  const [deployingLogs, setDeployingLogs] = useState<string[]>([]);
   
   // UK CV Data (Used for Job Matching)
   const [ukResumeData, setUkResumeData] = useState<UKResumeData | null>(null);
@@ -59,6 +60,10 @@ const App: React.FC = () => {
   // Editing State
   const [editPrompt, setEditPrompt] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  
+  // API Key Manual Fallback
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [manualKeyInput, setManualKeyInput] = useState('');
 
   // User Preferences
   const [prefs, setPrefs] = useState<UserPreferences>({
@@ -180,10 +185,26 @@ const App: React.FC = () => {
       setTimeout(() => setStep(AppStep.PREVIEW), 500);
     } catch (error: any) {
       console.error(error);
-      // DISPLAY THE SPECIFIC ERROR FROM SERVICE
-      alert(`Generation Failed: ${error.message || "Unknown neural error"}`);
-      setStep(AppStep.INPUT);
+      
+      // Handle Missing API Key specifically to allow manual input
+      if (error.message.includes("API_KEY_MISSING") || error.message.includes("Invalid API Key")) {
+          setStep(AppStep.INPUT);
+          setShowApiKeyModal(true);
+      } else {
+          alert(`Generation Failed: ${error.message || "Unknown neural error"}`);
+          setStep(AppStep.INPUT);
+      }
     }
+  };
+
+  const handleManualKeySubmit = () => {
+      if (manualKeyInput.trim().length > 10) {
+          setManualApiKey(manualKeyInput);
+          setShowApiKeyModal(false);
+          alert("Key updated! Please try generating again.");
+      } else {
+          alert("Invalid API Key format.");
+      }
   };
 
   const handleEditPortfolio = async () => {
@@ -195,7 +216,11 @@ const App: React.FC = () => {
       setPortfolio(updatedData);
       setEditPrompt('');
     } catch (e: any) {
-      alert(`Edit failed: ${e.message}`);
+      if (e.message.includes("API_KEY_MISSING") || e.message.includes("Invalid API Key")) {
+         setShowApiKeyModal(true);
+      } else {
+         alert(`Edit failed: ${e.message}`);
+      }
     } finally {
       setIsEditing(false);
     }
@@ -207,9 +232,13 @@ const App: React.FC = () => {
       return;
     }
     setStep(AppStep.DEPLOYING);
-    setLoadingMsg("Agent 2: Deploying to GitHub...");
+    setDeployingLogs([]);
+    setLoadingMsg("Agent 2: Initializing Deployment...");
+    
     try {
-      const url = await deployToGitHub(githubToken.trim(), portfolio!);
+      const url = await deployToGitHub(githubToken.trim(), portfolio!, (msg) => {
+          setDeployingLogs(prev => [...prev, msg]);
+      });
       setDeployedUrl(url);
       saveToHistory(portfolio!, url);
       setStep(AppStep.SUCCESS);
@@ -310,8 +339,8 @@ const App: React.FC = () => {
                     {history.map(item => (
                       <a href={item.url || '#'} target="_blank" rel="noreferrer" key={item.id} className="glass p-4 rounded-2xl flex flex-col gap-2 border border-white/5 hover:border-indigo-500/30 transition-all text-left group">
                           <div className="flex justify-between items-start">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-white group-hover:text-indigo-400 transition-colors truncate">{item.name}</span>
-                              <i className="fas fa-external-link-alt text-[10px] text-slate-600 group-hover:text-indigo-400"></i>
+                              <span className="text-[10px] font-black uppercase tracking-widest text-white group-hover:text-indigo-400 transition-colors truncate w-full">{item.name}</span>
+                              <i className="fas fa-external-link-alt text-[10px] text-slate-600 group-hover:text-indigo-400 flex-shrink-0 ml-2"></i>
                           </div>
                           <span className="text-[8px] font-bold text-slate-500 uppercase truncate">{item.title}</span>
                           <span className="text-[7px] text-slate-600 font-mono mt-1">{item.deployedAt}</span>
@@ -323,6 +352,32 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODALS */}
+      <AnimatePresence>
+          {showApiKeyModal && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="glass p-8 rounded-3xl max-w-md w-full border-red-500/30 shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+                      <div className="text-center mb-6">
+                          <i className="fas fa-key text-3xl text-red-400 mb-4"></i>
+                          <h3 className="text-xl font-bold text-white mb-2">API Key Required</h3>
+                          <p className="text-xs text-slate-400">The build-time API Key is missing or invalid. Please enter your Google Gemini API Key manually to continue.</p>
+                      </div>
+                      <input 
+                        type="password" 
+                        value={manualKeyInput}
+                        onChange={(e) => setManualKeyInput(e.target.value)}
+                        placeholder="AIzaSy..."
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl p-4 text-white text-sm mb-4 focus:border-red-400 outline-none"
+                      />
+                      <div className="flex gap-3">
+                          <button onClick={() => setShowApiKeyModal(false)} className="flex-1 py-3 rounded-xl border border-white/10 text-slate-400 text-xs font-bold uppercase hover:bg-white/5">Cancel</button>
+                          <button onClick={handleManualKeySubmit} className="flex-1 py-3 rounded-xl bg-red-500 text-white text-xs font-bold uppercase hover:bg-red-400 shadow-lg">Save Key</button>
+                      </div>
+                  </div>
+              </motion.div>
+          )}
+      </AnimatePresence>
 
       {/* UK RESUME VIEW */}
       {mode === AppMode.UK_RESUME && (
@@ -524,27 +579,6 @@ const App: React.FC = () => {
                 </motion.div>
               )}
 
-              {step === AppStep.GENERATING && (
-                <motion.div key="gen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen flex flex-col items-center justify-center px-6">
-                  <div className="relative w-32 h-32 mb-12">
-                      <div className="absolute inset-0 border-t-4 border-indigo-500 rounded-full animate-spin"></div>
-                      <div className="absolute inset-4 border-l-4 border-cyan-500 rounded-full animate-spin-slow"></div>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <i className="fas fa-brain text-4xl text-indigo-400 animate-pulse"></i>
-                      </div>
-                  </div>
-                  <div className="text-center space-y-4">
-                    <p className="text-4xl font-black uppercase italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-cyan-300">{motivationalQuote}</p>
-                    <div className="inline-block px-4 py-2 rounded-full bg-white/5 border border-white/10">
-                        <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest animate-pulse flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                          {loadingMsg}
-                        </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
               {step === AppStep.PREVIEW && portfolio && (
                 <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pb-32 relative">
                   
@@ -626,7 +660,14 @@ const App: React.FC = () => {
                       <div className="absolute inset-0 flex items-center justify-center"><i className="fab fa-github text-5xl opacity-40"></i></div>
                   </div>
                   <p className="text-3xl font-black uppercase italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 mb-2">Syncing with Repository...</p>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest animate-pulse">Establishing secure pipeline</p>
+                  
+                  <div className="max-w-md mx-auto w-full space-y-2 mt-8">
+                     {deployingLogs.map((log, i) => (
+                        <motion.div key={i} initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="text-xs text-slate-500 font-mono text-left p-2 border-l border-indigo-500/30 bg-white/5 rounded-r">
+                           <span className="text-indigo-400 mr-2">></span> {log}
+                        </motion.div>
+                     ))}
+                  </div>
                 </motion.div>
               )}
 

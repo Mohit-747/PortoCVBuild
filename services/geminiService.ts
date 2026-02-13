@@ -10,31 +10,24 @@ const sanitizeKey = (key: string | undefined) => {
     return key.trim().replace(/^["']|["']$/g, '');
 };
 
-const API_KEY_POOL = [
-  sanitizeKey(process.env.API_KEY), 
-  // Add backup keys here if needed
-].filter((k): k is string => !!k && k.length > 10 && !k.startsWith("AIzaSy...Paste"));
+let manualKey = '';
 
-let currentKeyIndex = 0;
-
-const getCurrentApiKey = () => {
-  if (API_KEY_POOL.length === 0) {
-    throw new Error("No valid API Keys found in environment. Please check Vercel settings.");
-  }
-  if (currentKeyIndex >= API_KEY_POOL.length) {
-    throw new Error("ALL_KEYS_EXHAUSTED: Daily quota reached for all provided keys.");
-  }
-  return API_KEY_POOL[currentKeyIndex];
+export const setManualApiKey = (key: string) => {
+    manualKey = sanitizeKey(key);
 };
 
-const rotateKey = () => {
-  currentKeyIndex++;
-  if (currentKeyIndex < API_KEY_POOL.length) {
-    console.warn(`[System] Quota exceeded. Rotating to API Key #${currentKeyIndex + 1}`);
-    return true; // Rotation successful
+const getEnvKey = () => sanitizeKey(process.env.API_KEY);
+
+const getCurrentApiKey = () => {
+  // Prioritize manual key if set by user in UI
+  if (manualKey && manualKey.length > 10) return manualKey;
+
+  const envKey = getEnvKey();
+  if (envKey && envKey.length > 10 && !envKey.startsWith("AIzaSy...Paste")) {
+      return envKey;
   }
-  console.error("[System] All API Keys have been exhausted.");
-  return false; // No more keys
+  
+  throw new Error("API_KEY_MISSING: Please enter your Google Gemini API Key.");
 };
 
 // Safety Settings to prevent false positives on Resume content
@@ -48,7 +41,8 @@ const SAFETY_SETTINGS = [
 // Generic wrapper for all AI calls to handle failover
 async function callWithRetry<T>(fn: (ai: GoogleGenAI) => Promise<T>, retries = 1, delay = 1000): Promise<T> {
   try {
-    const ai = new GoogleGenAI({ apiKey: getCurrentApiKey() });
+    const apiKey = getCurrentApiKey();
+    const ai = new GoogleGenAI({ apiKey });
     return await fn(ai);
   } catch (error: any) {
     // 1. Check for Quota Exceeded (429)
@@ -58,16 +52,17 @@ async function callWithRetry<T>(fn: (ai: GoogleGenAI) => Promise<T>, retries = 1
                          (error.message && error.message.includes('RESOURCE_EXHAUSTED'));
 
     if (isQuotaError) {
-      if (rotateKey()) {
-        return callWithRetry(fn, retries, 0);
-      } else {
-        throw new Error("429 Resource Exhausted: Your API Key quota is full.");
-      }
+       throw new Error("429 Resource Exhausted: Your API Key quota is full.");
     }
 
     // 2. Check for Invalid Key (400)
     if (error.status === 400 || (error.message && error.message.includes('API key not valid'))) {
-         throw new Error("400 Invalid API Key: Please check your Vercel Environment Variables.");
+         throw new Error("400 Invalid API Key: Please check your API Key.");
+    }
+    
+    // Check for missing key explicitly
+    if (error.message && error.message.includes('API_KEY_MISSING')) {
+        throw error;
     }
 
     // 3. Standard exponential backoff for server errors
@@ -104,7 +99,7 @@ export const generatePortfolioData = async (
     }
     
     if (styleGuidance === "") {
-      styleGuidance = "CREATIVE FREEDOM: Create a COMPLETELY UNIQUE visual identity. Randomize colors, moods, and layouts. Do not default to blue/dark. USE BRIGHT, VIBRANT, NEON, OR PASTEL SCHEMES. Ensure high contrast.";
+      styleGuidance = "CREATIVE FREEDOM: Create a COMPLETELY UNIQUE visual identity. Randomize colors, moods, and layouts. Do not default to blue/dark. USE BRIGHT, VIBRANT, NEON, OR PASTEL SCHEMES. Ensure high contrast. Mix primary and accent colors boldly.";
     }
 
     let parts: any[] = [
@@ -112,11 +107,11 @@ export const generatePortfolioData = async (
 
 MANDATORY DIRECTIVES:
 1. ${styleGuidance}
-2. COLOR PALETTE: If 'auto', generate a unique, harmonic palette. Use bright and distinct colors if possible.
+2. COLOR PALETTE: If 'auto', generate a unique, harmonic palette using BRIGHT and DISTINCT colors (e.g., Cyberpunk Pink, Electric Blue, Emerald Green, Sunset Orange). Avoid generic corporate blues.
 3. SKILLS: Extract exactly top 10 skills.
 4. SOCIALS: Extract ALL available social links.
 5. QUOTE: A powerful, short professional manifesto.
-6. UNIQUE_SEED: ${Date.now()} (Ensure output is unique based on this timestamp).
+6. UNIQUE_SEED: ${Date.now()}-${Math.random()} (Ensure output is unique based on this timestamp).
 
 OUTPUT: Strict JSON only.` }
     ];
@@ -136,7 +131,7 @@ OUTPUT: Strict JSON only.` }
       model: "gemini-3-pro-preview",
       contents: { parts },
       config: {
-        temperature: 0.95,
+        temperature: 1.0, // Increased temperature for uniqueness
         responseMimeType: "application/json",
         safetySettings: SAFETY_SETTINGS,
         responseSchema: {
