@@ -664,7 +664,7 @@ const App: React.FC = () => {
                   <div className="max-w-md mx-auto w-full space-y-2 mt-8">
                      {deployingLogs.map((log, i) => (
                         <motion.div key={i} initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} className="text-xs text-slate-500 font-mono text-left p-2 border-l border-indigo-500/30 bg-white/5 rounded-r">
-                           <span className="text-indigo-400 mr-2">></span> {log}
+                           <span className="text-indigo-400 mr-2">{'>'}</span> {log}
                         </motion.div>
                      ))}
                   </div>
