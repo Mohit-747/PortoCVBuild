@@ -121,7 +121,15 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
 
   if (!data || !data.name) return null;
 
-  const SectionTitle: React.FC<{ children: React.ReactNode; subtitle?: string; color?: string }> = ({ children, subtitle, color }) => (
+  const SectionTitle: React.FC<{ 
+    children: React.ReactNode; 
+    subtitle?: string; 
+    color?: string;
+    // Props added to satisfy TS when passed, though closure variables are used
+    isLight?: boolean;
+    textPrimary?: string;
+    textMuted?: string;
+  }> = ({ children, subtitle, color }) => (
     <div className="mb-20 text-center relative z-10">
       <motion.div
         initial={{ opacity: 0, y: 30 }}
