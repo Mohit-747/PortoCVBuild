@@ -263,7 +263,7 @@ export const JobHunter: React.FC<Props> = ({ onBack, resumeData, setResumeData }
                  {!loading && jobs.length === 0 && (
                      <div className="p-8 glass rounded-3xl text-center border-2 border-dashed border-white/5">
                          <i className="fas fa-ghost text-4xl text-slate-600 mb-4"></i>
-                         <p className="text-xs font-bold uppercase tracking-widest text-slate-400">No jobs found matching {">"}= 60%</p>
+                         <p className="text-xs font-bold uppercase tracking-widest text-slate-400">No jobs found matching &gt;= 60%</p>
                      </div>
                  )}
 
@@ -337,7 +337,7 @@ export const JobHunter: React.FC<Props> = ({ onBack, resumeData, setResumeData }
                                             </button>
                                         </div>
                                     ) : (
-                                        <p className="text-[10px] text-red-400 font-bold uppercase tracking-wide">Score too low to auto-mould (Needs >60%)</p>
+                                        <p className="text-[10px] text-red-400 font-bold uppercase tracking-wide">Score too low to auto-mould (Needs &gt;60%)</p>
                                     )}
                                 </div>
                             )}
