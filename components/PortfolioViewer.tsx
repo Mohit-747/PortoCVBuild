@@ -38,11 +38,12 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
   const textMuted = isLight ? 'text-slate-500' : 'text-slate-500';
   
   // Custom Card Style with Colored Shadow
+  // We set the initial state here. The hover state will be handled by Framer Motion variants.
   const cardStyle = {
     backgroundColor: isLight ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.03)',
     borderColor: isLight ? `rgba(${primaryRgb}, 0.1)` : `rgba(${primaryRgb}, 0.2)`,
-    boxShadow: `0 10px 40px -10px rgba(${primaryRgb}, ${isLight ? 0.2 : 0.25})`,
-    backdropFilter: 'blur(10px)'
+    boxShadow: `0 10px 40px -10px rgba(${primaryRgb}, ${isLight ? 0.15 : 0.2})`,
+    backdropFilter: 'blur(10px)',
   };
 
   const navText = isLight ? 'text-slate-400 group-hover:text-slate-900' : 'text-slate-500 group-hover:text-white';
@@ -71,14 +72,34 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
     visible: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", bounce: 0.5 } }
   };
 
-  const getVariant = () => {
+  const getBaseVariant = () => {
     if (animStyle === 'slide') return slideIn;
     if (animStyle === 'scale') return scaleIn;
     if (animStyle === 'pop') return popIn;
     return fadeInUp;
   };
 
-  const anim = getVariant();
+  // Merge base animation with the hover "Pop" effect
+  // This ensures the box itself moves, carrying the text with it, without distorting the text.
+  const getCardVariants = () : Variants => {
+    const base = getBaseVariant();
+    return {
+      ...base,
+      hover: {
+        y: -12, // Lift up
+        scale: 1.02, // Slight growth
+        borderColor: `rgba(${primaryRgb}, 0.6)`, // Glow border
+        boxShadow: `0 25px 60px -10px rgba(${primaryRgb}, ${isLight ? 0.4 : 0.5})`, // Intense colored shadow
+        transition: {
+          type: "spring",
+          stiffness: 400,
+          damping: 25
+        }
+      }
+    };
+  };
+
+  const cardVariants = getCardVariants();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -131,6 +152,18 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
   const displaySkills = data.skills.slice(0, 10);
+
+  // Helper for Social Links
+  const SocialLink = ({ href, icon, label }: { href: string, icon: string, label: string }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 group">
+      <div className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-slate-900 group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-white group-hover:text-black'}`}
+           style={{ borderColor: `rgba(${primaryRgb}, 0.2)` }}
+      >
+        <i className={`fab ${icon} text-2xl`}></i>
+      </div>
+      <span className={`text-[10px] font-bold uppercase tracking-widest group-hover:text-inherit ${textMuted}`}>{label}</span>
+    </a>
+  );
 
   return (
     <div ref={containerRef} className={`w-full relative ${textPrimary} selection:bg-indigo-500/30`} style={{ backgroundColor: 'transparent' }}>
@@ -218,7 +251,8 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
         <section id="about" className="py-32 scroll-mt-20">
           <SectionTitle subtitle="Overview" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>About</SectionTitle>
           <motion.div 
-            initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
+            variants={cardVariants}
+            initial="hidden" whileInView="visible" viewport={{ once: true }} whileHover="hover"
             className={`rounded-[40px] p-10 md:p-20 border relative overflow-hidden`}
             style={cardStyle}
           >
@@ -231,15 +265,16 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
         {/* TECHNICAL SKILLS */}
         <section id="skills" className="py-32 scroll-mt-20">
           <SectionTitle subtitle="Core Competencies" color={primaryColor}>Top Skills</SectionTitle>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {displaySkills.map((skill, i) => (
               <motion.div
                 key={i}
-                initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim} transition={{ delay: i * 0.05 }}
-                className={`rounded-2xl border p-6 text-center transition-all hover:scale-105`}
+                variants={cardVariants}
+                initial="hidden" whileInView="visible" viewport={{ once: true }} whileHover="hover" transition={{ delay: i * 0.05 }}
+                className={`rounded-3xl border p-10 text-center transition-all cursor-default flex items-center justify-center`}
                 style={cardStyle}
               >
-                <span className={`text-[11px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{skill}</span>
+                <span className={`text-sm md:text-lg font-bold uppercase tracking-widest ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{skill}</span>
               </motion.div>
             ))}
           </div>
@@ -252,16 +287,17 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
             {data.experience.map((exp, i) => (
               <motion.div 
                 key={i} 
-                initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
+                variants={cardVariants}
+                initial="hidden" whileInView="visible" viewport={{ once: true }} whileHover="hover"
                 className={`p-10 md:p-14 rounded-[32px] border transition-all`}
                 style={cardStyle}
               >
                 <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
                   <div>
                     <h3 className={`text-3xl font-bold mb-2 ${textPrimary}`}>{exp.role}</h3>
-                    <p className="text-lg font-bold uppercase tracking-widest" style={{ color: primaryColor }}>{exp.company}</p>
+                    <p className="text-xl font-bold uppercase tracking-widest" style={{ color: primaryColor }}>{exp.company}</p>
                   </div>
-                  <div className={`${textMuted} font-bold text-xs uppercase tracking-widest pt-2`}>
+                  <div className={`${textMuted} font-bold text-sm uppercase tracking-widest pt-2`}>
                     {exp.period}
                   </div>
                 </div>
@@ -280,7 +316,8 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
             {data.projects.map((proj, i) => (
               <motion.div 
                 key={i} 
-                initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
+                variants={cardVariants}
+                initial="hidden" whileInView="visible" viewport={{ once: true }} whileHover="hover"
                 className={`rounded-[32px] overflow-hidden border transition-all flex flex-col h-full`}
                 style={cardStyle}
               >
@@ -291,7 +328,7 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
                   </p>
                   <div className="mt-auto flex flex-wrap gap-2">
                     {proj.tech.map((t, idx) => (
-                      <span key={idx} className={`px-3 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest ${isLight ? 'bg-slate-900/10 text-slate-600' : 'bg-white/10 text-slate-400'}`}>
+                      <span key={idx} className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest ${isLight ? 'bg-slate-900/10 text-slate-600' : 'bg-white/10 text-slate-400'}`}>
                         {t}
                       </span>
                     ))}
@@ -309,16 +346,19 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
             {data.education.map((edu, i) => (
               <motion.div 
                 key={i} 
-                initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
+                variants={cardVariants}
+                initial="hidden" whileInView="visible" viewport={{ once: true }} whileHover="hover"
                 className={`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6`}
                 style={cardStyle}
               >
-                <div className="text-center md:text-left">
-                  <h3 className={`text-xl font-bold ${textPrimary}`}>{edu.degree}</h3>
-                  <p className={`${textMuted} font-semibold uppercase tracking-widest text-xs mt-1`}>{edu.institution}</p>
-                </div>
-                <div className={`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest border ${isLight ? 'bg-slate-900/5 text-slate-500 border-slate-900/5' : 'bg-white/5 text-slate-400 border-white/5'}`}>
-                  {edu.year}
+                <div className="w-full flex flex-col md:flex-row justify-between items-center gap-6">
+                  <div className="text-center md:text-left">
+                    <h3 className={`text-xl font-bold ${textPrimary}`}>{edu.degree}</h3>
+                    <p className={`${textMuted} font-semibold uppercase tracking-widest text-xs mt-1`}>{edu.institution}</p>
+                  </div>
+                  <div className={`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest border ${isLight ? 'bg-slate-900/5 text-slate-500 border-slate-900/5' : 'bg-white/5 text-slate-400 border-white/5'}`}>
+                    {edu.year}
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -329,44 +369,22 @@ export const PortfolioViewer: React.FC<Props> = ({ data }) => {
         <section id="contact" className="py-40 flex flex-col items-center justify-center scroll-mt-20">
           <SectionTitle subtitle="Get In Touch" color={primaryColor}>Network</SectionTitle>
           <motion.div 
-            initial="hidden" whileInView="visible" viewport={{ once: true }} variants={anim}
+            initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}
             className="text-center space-y-16 w-full"
           >
             <a href={`mailto:${data.email}`} className={`text-3xl md:text-6xl font-bold hover:text-indigo-400 transition-colors lowercase tracking-tight block ${textPrimary}`} style={{ textShadow: `0 0 20px rgba(${primaryRgb}, 0.2)` }}>
               {data.email}
             </a>
 
-            <div className="flex flex-wrap justify-center gap-6 md:gap-12">
-              {data.socialLinks?.linkedin && (
-                <a href={data.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 group">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-[#0077b5] group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-[#0077b5]'}`}
-                       style={{ borderColor: `rgba(${primaryRgb}, 0.2)` }}
-                  >
-                    <i className="fab fa-linkedin-in text-xl"></i>
-                  </div>
-                  <span className={`text-[9px] font-bold uppercase tracking-widest group-hover:text-inherit ${textMuted}`}>LinkedIn</span>
-                </a>
-              )}
-              {data.socialLinks?.github && (
-                <a href={data.socialLinks.github} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 group">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-slate-900 group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-white group-hover:text-black'}`}
-                       style={{ borderColor: `rgba(${primaryRgb}, 0.2)` }}
-                  >
-                    <i className="fab fa-github text-xl"></i>
-                  </div>
-                  <span className={`text-[9px] font-bold uppercase tracking-widest group-hover:text-inherit ${textMuted}`}>GitHub</span>
-                </a>
-              )}
-              {data.socialLinks?.twitter && (
-                <a href={data.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 group">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center border transition-all ${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-[#1DA1F2] group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-[#1DA1F2]'}`}
-                       style={{ borderColor: `rgba(${primaryRgb}, 0.2)` }}
-                  >
-                    <i className="fab fa-twitter text-xl"></i>
-                  </div>
-                  <span className={`text-[9px] font-bold uppercase tracking-widest group-hover:text-inherit ${textMuted}`}>Twitter</span>
-                </a>
-              )}
+            <div className="flex flex-wrap justify-center gap-8 md:gap-12">
+              {data.socialLinks?.linkedin && <SocialLink href={data.socialLinks.linkedin} icon="fa-linkedin-in" label="LinkedIn" />}
+              {data.socialLinks?.github && <SocialLink href={data.socialLinks.github} icon="fa-github" label="GitHub" />}
+              {data.socialLinks?.twitter && <SocialLink href={data.socialLinks.twitter} icon="fa-twitter" label="X / Twitter" />}
+              {data.socialLinks?.instagram && <SocialLink href={data.socialLinks.instagram} icon="fa-instagram" label="Instagram" />}
+              {data.socialLinks?.facebook && <SocialLink href={data.socialLinks.facebook} icon="fa-facebook-f" label="Facebook" />}
+              {data.socialLinks?.dribbble && <SocialLink href={data.socialLinks.dribbble} icon="fa-dribbble" label="Dribbble" />}
+              {data.socialLinks?.behance && <SocialLink href={data.socialLinks.behance} icon="fa-behance" label="Behance" />}
+              {data.socialLinks?.whatsapp && <SocialLink href={data.socialLinks.whatsapp} icon="fa-whatsapp" label="WhatsApp" />}
             </div>
           </motion.div>
         </section>

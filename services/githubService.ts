@@ -279,7 +279,7 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
             const cardStyle = {
                 backgroundColor: isLight ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.03)',
                 borderColor: isLight ? \`rgba(\${primaryRgb}, 0.1)\` : \`rgba(\${primaryRgb}, 0.2)\`,
-                boxShadow: \`0 10px 40px -10px rgba(\${primaryRgb}, \${isLight ? 0.2 : 0.25})\`,
+                boxShadow: \`0 10px 40px -10px rgba(\${primaryRgb}, \${isLight ? 0.15 : 0.2})\`,
                 backdropFilter: 'blur(10px)'
             };
 
@@ -288,17 +288,44 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
             const scaleIn = { hidden: { opacity: 0, scale: 0.8 }, visible: { opacity: 1, scale: 1, transition: { duration: 0.5 } } };
             const popIn = { hidden: { opacity: 0, scale: 0.5, y: 50 }, visible: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", bounce: 0.5 } } };
 
-            const getVariant = () => {
+            const getBaseVariant = () => {
                 if (animStyle === 'slide') return slideIn;
                 if (animStyle === 'scale') return scaleIn;
                 if (animStyle === 'pop') return popIn;
                 return fadeInUp;
             };
-            const anim = getVariant();
+
+            // Merge base animation with the hover "Pop" effect
+            const getCardVariants = () => {
+                const base = getBaseVariant();
+                return {
+                    ...base,
+                    hover: {
+                        y: -12, // Lift up
+                        scale: 1.02, // Slight growth
+                        borderColor: \`rgba(\${primaryRgb}, 0.6)\`, // Glow border
+                        boxShadow: \`0 25px 60px -10px rgba(\${primaryRgb}, \${isLight ? 0.4 : 0.5})\`, // Intense colored shadow
+                        transition: { type: "spring", stiffness: 400, damping: 25 }
+                    }
+                };
+            };
+            const cardVariants = getCardVariants();
 
             const heroY = useTransform(scrollYProgress, [0, 0.2], [0, -100]);
             const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
             const displaySkills = data.skills.slice(0, 10);
+
+            // Helper for Social Links
+            const SocialLink = ({ href, icon, label }) => (
+                <a href={href} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 group">
+                <div className={\`w-14 h-14 rounded-full flex items-center justify-center border transition-all \${isLight ? 'bg-slate-900/5 border-slate-900/10 group-hover:bg-slate-900 group-hover:text-white' : 'bg-white/5 border-white/10 group-hover:bg-white group-hover:text-black'}\`}
+                    style={{ borderColor: \`rgba(\${primaryRgb}, 0.2)\` }}
+                >
+                    <i className={\`fab \${icon} text-2xl\`}></i>
+                </div>
+                <span className={\`text-[10px] font-bold uppercase tracking-widest group-hover:text-inherit \${textMuted}\`}>{label}</span>
+                </a>
+            );
 
             return (
                 <div ref={containerRef} className={\`w-full relative min-h-screen \${textPrimary}\`}>
@@ -330,17 +357,17 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                                     </div>
                                 </motion.div>
                                 <div className="space-y-6">
-                                    <motion.div initial="hidden" animate="visible" variants={anim} className={\`inline-flex items-center gap-3 px-6 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.4em] border \${isLight ? 'bg-slate-900/5 text-slate-500 border-slate-900/5' : 'bg-white/5 text-slate-400 border-white/5'}\`}>
+                                    <motion.div initial="hidden" animate="visible" variants={fadeInUp} className={\`inline-flex items-center gap-3 px-6 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.4em] border \${isLight ? 'bg-slate-900/5 text-slate-500 border-slate-900/5' : 'bg-white/5 text-slate-400 border-white/5'}\`}>
                                         {data.location || 'Global'}
                                     </motion.div>
-                                    <motion.h1 initial="hidden" animate="visible" variants={anim} transition={{delay:0.2}} className="text-5xl md:text-8xl lg:text-9xl font-bold tracking-tight uppercase leading-none">
+                                    <motion.h1 initial="hidden" animate="visible" variants={fadeInUp} transition={{delay:0.2}} className="text-5xl md:text-8xl lg:text-9xl font-bold tracking-tight uppercase leading-none">
                                         {data.name.split(' ')[0]} <span style={{ color: primaryColor, textShadow: \`0 0 40px rgba(\${primaryRgb}, 0.3)\` }}>{data.name.split(' ').slice(1).join(' ')}</span>
                                     </motion.h1>
-                                    <motion.p initial="hidden" animate="visible" variants={anim} transition={{delay:0.4}} className={\`text-xl md:text-3xl font-medium mt-8 max-w-3xl mx-auto leading-relaxed \${textSecondary}\`}>
+                                    <motion.p initial="hidden" animate="visible" variants={fadeInUp} transition={{delay:0.4}} className={\`text-xl md:text-3xl font-medium mt-8 max-w-3xl mx-auto leading-relaxed \${textSecondary}\`}>
                                         {data.title}
                                     </motion.p>
                                     {data.quote && (
-                                        <motion.div initial="hidden" animate="visible" variants={anim} transition={{delay:0.6}} className="mt-8 relative inline-block px-8">
+                                        <motion.div initial="hidden" animate="visible" variants={fadeInUp} transition={{delay:0.6}} className="mt-8 relative inline-block px-8">
                                             <p className={\`text-sm md:text-base font-serif italic tracking-wide max-w-lg mx-auto \${textMuted}\`}>"{data.quote}"</p>
                                         </motion.div>
                                     )}
@@ -350,17 +377,17 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
 
                         <section id="about" className="py-24 md:py-32 scroll-mt-20">
                             <SectionTitle subtitle="Overview" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>About</SectionTitle>
-                            <motion.div initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`rounded-[40px] p-8 md:p-20 border relative overflow-hidden\`} style={cardStyle}>
+                            <motion.div variants={cardVariants} initial="hidden" whileInView="visible" viewport={{once:true}} whileHover="hover" className={\`rounded-[40px] p-8 md:p-20 border relative overflow-hidden\`} style={cardStyle}>
                                 <p className={\`text-xl md:text-4xl font-medium leading-snug tracking-tight \${textPrimary}\`}>{data.summary}</p>
                             </motion.div>
                         </section>
 
                         <section id="skills" className="py-24 md:py-32 scroll-mt-20">
                             <SectionTitle subtitle="Competencies" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Skills</SectionTitle>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
                                 {displaySkills.map((skill, i) => (
-                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} transition={{delay: i*0.05}} className={\`rounded-2xl border p-6 text-center transition-all hover:scale-105\`} style={cardStyle}>
-                                        <span className={\`text-[10px] md:text-[11px] font-bold uppercase tracking-widest \${isLight ? 'text-slate-600' : 'text-slate-300'}\`}>{skill}</span>
+                                    <motion.div key={i} variants={cardVariants} initial="hidden" whileInView="visible" viewport={{once:true}} whileHover="hover" transition={{delay: i*0.05}} className={\`rounded-3xl border p-10 text-center transition-all cursor-default flex items-center justify-center\`} style={cardStyle}>
+                                        <span className={\`text-sm md:text-lg font-bold uppercase tracking-widest \${isLight ? 'text-slate-700' : 'text-slate-200'}\`}>{skill}</span>
                                     </motion.div>
                                 ))}
                             </div>
@@ -370,10 +397,10 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                             <SectionTitle subtitle="Trajectory" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Experience</SectionTitle>
                             <div className="space-y-8 md:space-y-12">
                                 {data.experience.map((exp, i) => (
-                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`p-8 md:p-14 rounded-[32px] border transition-all\`} style={cardStyle}>
+                                    <motion.div key={i} variants={cardVariants} initial="hidden" whileInView="visible" viewport={{once:true}} whileHover="hover" className={\`p-8 md:p-14 rounded-[32px] border transition-all\`} style={cardStyle}>
                                         <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
-                                            <div><h3 className={\`text-2xl md:text-3xl font-bold mb-2 \${textPrimary}\`}>{exp.role}</h3><p className="text-sm md:text-lg font-bold uppercase tracking-widest" style={{ color: primaryColor }}>{exp.company}</p></div>
-                                            <div className={\`\${textMuted} font-bold text-xs uppercase tracking-widest pt-2 whitespace-nowrap\`}>{exp.period}</div>
+                                            <div><h3 className={\`text-2xl md:text-3xl font-bold mb-2 \${textPrimary}\`}>{exp.role}</h3><p className="text-xl font-bold uppercase tracking-widest" style={{ color: primaryColor }}>{exp.company}</p></div>
+                                            <div className={\`\${textMuted} font-bold text-sm uppercase tracking-widest pt-2 whitespace-nowrap\`}>{exp.period}</div>
                                         </div>
                                         <p className={\`\${textSecondary} text-base md:text-lg leading-relaxed whitespace-pre-line\`}>{exp.description}</p>
                                     </motion.div>
@@ -385,11 +412,11 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                             <SectionTitle subtitle="Impact" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Projects</SectionTitle>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">
                                 {data.projects.map((proj, i) => (
-                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`rounded-[32px] overflow-hidden border transition-all flex flex-col h-full\`} style={cardStyle}>
+                                    <motion.div key={i} variants={cardVariants} initial="hidden" whileInView="visible" viewport={{once:true}} whileHover="hover" className={\`rounded-[32px] overflow-hidden border transition-all flex flex-col h-full\`} style={cardStyle}>
                                         <div className="p-8 md:p-10 flex flex-col flex-1">
                                             <h3 className={\`text-2xl md:text-3xl font-bold mb-6 \${textPrimary}\`}>{proj.title}</h3>
                                             <p className={\`\${textSecondary} text-base md:text-lg leading-relaxed mb-8\`}>{proj.description}</p>
-                                            <div className="mt-auto flex flex-wrap gap-2">{proj.tech.map((t, idx) => <span key={idx} className={\`px-3 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest \${isLight ? 'bg-slate-900/10 text-slate-600' : 'bg-white/10 text-slate-400'}\`}>{t}</span>)}</div>
+                                            <div className="mt-auto flex flex-wrap gap-2">{proj.tech.map((t, idx) => <span key={idx} className={\`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest \${isLight ? 'bg-slate-900/10 text-slate-600' : 'bg-white/10 text-slate-400'}\`}>{t}</span>)}</div>
                                         </div>
                                     </motion.div>
                                 ))}
@@ -400,9 +427,11 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                             <SectionTitle subtitle="Academics" color={primaryColor} isLight={isLight} textPrimary={textPrimary} textMuted={textMuted}>Education</SectionTitle>
                             <div className="max-w-4xl mx-auto space-y-6">
                                 {data.education.map((edu, i) => (
-                                    <motion.div key={i} initial="hidden" whileInView="visible" viewport={{once:true}} variants={anim} className={\`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6\`} style={cardStyle}>
-                                        <div className="text-center md:text-left"><h3 className={\`text-lg md:text-xl font-bold \${textPrimary}\`}>{edu.degree}</h3><p className={\`\${textMuted} font-semibold uppercase tracking-widest text-xs mt-1\`}>{edu.institution}</p></div>
-                                        <div className={\`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest border whitespace-nowrap \${isLight ? 'bg-slate-900/5 text-slate-500 border-slate-900/5' : 'bg-white/5 text-slate-400 border-white/5'}\`}>{edu.year}</div>
+                                    <motion.div key={i} variants={cardVariants} initial="hidden" whileInView="visible" viewport={{once:true}} whileHover="hover" className={\`p-8 rounded-2xl border flex flex-col md:flex-row justify-between items-center gap-6\`} style={cardStyle}>
+                                        <div className="w-full flex flex-col md:flex-row justify-between items-center gap-6">
+                                            <div className="text-center md:text-left"><h3 className={\`text-lg md:text-xl font-bold \${textPrimary}\`}>{edu.degree}</h3><p className={\`\${textMuted} font-semibold uppercase tracking-widest text-xs mt-1\`}>{edu.institution}</p></div>
+                                            <div className={\`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest border whitespace-nowrap \${isLight ? 'bg-slate-900/5 text-slate-500 border-slate-900/5' : 'bg-white/5 text-slate-400 border-white/5'}\`}>{edu.year}</div>
+                                        </div>
                                     </motion.div>
                                 ))}
                             </div>
@@ -413,9 +442,14 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
                             <div className="text-center space-y-16 w-full">
                                 <a href={\`mailto:\${data.email}\`} className={\`text-3xl md:text-6xl font-bold hover:text-indigo-400 transition-colors lowercase tracking-tight block break-all \${textPrimary}\`} style={{ textShadow: \`0 0 20px rgba(\${primaryRgb}, 0.2)\` }}>{data.email}</a>
                                 <div className="flex flex-wrap justify-center gap-8 md:gap-12">
-                                    {data.socialLinks?.linkedin && <a href={data.socialLinks.linkedin} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><div style={{ borderColor: \`rgba(\${primaryRgb}, 0.2)\` }} className="w-12 h-12 rounded-full border flex items-center justify-center"><i className="fab fa-linkedin-in text-xl"></i></div><span className="text-[9px] uppercase tracking-widest">LinkedIn</span></a>}
-                                    {data.socialLinks?.github && <a href={data.socialLinks.github} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><div style={{ borderColor: \`rgba(\${primaryRgb}, 0.2)\` }} className="w-12 h-12 rounded-full border flex items-center justify-center"><i className="fab fa-github text-xl"></i></div><span className="text-[9px] uppercase tracking-widest">GitHub</span></a>}
-                                    {data.socialLinks?.twitter && <a href={data.socialLinks.twitter} target="_blank" className="flex flex-col items-center gap-2 group opacity-60 hover:opacity-100 transition-opacity"><div style={{ borderColor: \`rgba(\${primaryRgb}, 0.2)\` }} className="w-12 h-12 rounded-full border flex items-center justify-center"><i className="fab fa-twitter text-xl"></i></div><span className="text-[9px] uppercase tracking-widest">X / Twitter</span></a>}
+                                    {data.socialLinks?.linkedin && <SocialLink href={data.socialLinks.linkedin} icon="fa-linkedin-in" label="LinkedIn" />}
+                                    {data.socialLinks?.github && <SocialLink href={data.socialLinks.github} icon="fa-github" label="GitHub" />}
+                                    {data.socialLinks?.twitter && <SocialLink href={data.socialLinks.twitter} icon="fa-twitter" label="X / Twitter" />}
+                                    {data.socialLinks?.instagram && <SocialLink href={data.socialLinks.instagram} icon="fa-instagram" label="Instagram" />}
+                                    {data.socialLinks?.facebook && <SocialLink href={data.socialLinks.facebook} icon="fa-facebook-f" label="Facebook" />}
+                                    {data.socialLinks?.dribbble && <SocialLink href={data.socialLinks.dribbble} icon="fa-dribbble" label="Dribbble" />}
+                                    {data.socialLinks?.behance && <SocialLink href={data.socialLinks.behance} icon="fa-behance" label="Behance" />}
+                                    {data.socialLinks?.whatsapp && <SocialLink href={data.socialLinks.whatsapp} icon="fa-whatsapp" label="WhatsApp" />}
                                 </div>
                             </div>
                         </section>
@@ -461,8 +495,9 @@ export const deployToGitHub = async (rawToken: string, data: PortfolioData): Pro
   };
 
   await pushFile('index.html', htmlContent);
-  await pushFile('README.md', `# ${data.name} - Portfolio\n\nGenerated by AI Agent (PortoCV).`);
-  await pushFile('portfolio.json', JSON.stringify(data, null, 2));
+  // Disabled auxiliary files upload as per user request to only upload index.html
+  // await pushFile('README.md', `# ${data.name} - Portfolio\n\nGenerated by AI Agent (PortoCV).`);
+  // await pushFile('portfolio.json', JSON.stringify(data, null, 2));
 
   // 5. Enable GitHub Pages
   // Use the default branch we found earlier to ensure we don't 404

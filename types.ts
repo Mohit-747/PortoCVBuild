@@ -44,9 +44,36 @@ export interface PortfolioData {
     linkedin?: string;
     twitter?: string;
     whatsapp?: string;
+    instagram?: string;
+    facebook?: string;
+    behance?: string;
+    dribbble?: string;
   };
   photoUrl?: string;
   theme?: ThemeConfig;
+}
+
+// UK Resume Specific Types
+export interface UKResumeData {
+  fullName: string;
+  contactInfo: string; // "Location | Phone | Email | LinkedIn"
+  professionalProfile: string; // The "Summary" equivalent
+  coreCompetencies: string[]; // Bullet points
+  experience: {
+    role: string;
+    company: string;
+    location: string;
+    dates: string;
+    responsibilities: string[]; // Bullet points
+  }[];
+  education: {
+    degree: string;
+    institution: string;
+    dates: string;
+    details?: string;
+  }[];
+  interests?: string; // Very common in UK CVs
+  references: string; // Usually "Available upon request"
 }
 
 export interface UserPreferences {
@@ -63,6 +90,8 @@ export interface PortfolioHistoryItem {
   title: string;
   photoUrl?: string;
   deployedAt: string;
+  type: 'portfolio' | 'resume';
+  url?: string;
 }
 
 export interface QAFeedback {
@@ -71,10 +100,33 @@ export interface QAFeedback {
   uxInsights: string;
 }
 
+export interface JobListing {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  type: 'Full-time' | 'Part-time' | 'Internship' | 'Contract';
+  postedAt: string;
+  description: string; // Short blurb
+  applyLink: string;
+  matchScore?: number; // Calculated by AI
+  matchReason?: string; // AI explanation
+}
+
+export enum AppMode {
+  LOGIN = 'LOGIN',
+  HOME = 'HOME',
+  PORTFOLIO = 'PORTFOLIO',
+  UK_RESUME = 'UK_RESUME',
+  JOB_HUNTER = 'JOB_HUNTER',
+  RESUME_MOULDER = 'RESUME_MOULDER'
+}
+
 export enum AppStep {
   INPUT = 'INPUT',
   GENERATING = 'GENERATING',
   PREVIEW = 'PREVIEW',
+  EDITING = 'EDITING', 
   DEPLOY_CONFIG = 'DEPLOY_CONFIG',
   DEPLOYING = 'DEPLOYING',
   SUCCESS = 'SUCCESS'
