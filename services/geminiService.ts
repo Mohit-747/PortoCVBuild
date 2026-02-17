@@ -26,7 +26,7 @@ class KeyManager {
 
         // 3. Load VITE_ specific keys (Standard for Vercel/Vite)
         // Checks VITE_API_KEY, and VITE_API_KEY_1 through VITE_API_KEY_10
-        // Fix: Cast import.meta to any to avoid TypeScript error regarding 'env' property
+        // We accept both import.meta.env (Vite) and process.env (Polyfilled)
         const env = (import.meta as any).env || process.env || {};
         
         if (env.VITE_API_KEY) this.keys.push(this.sanitize(env.VITE_API_KEY));
@@ -44,7 +44,7 @@ class KeyManager {
         }
 
         // Deduplicate
-        this.keys = [...new Set(this.keys)].filter(k => k.length > 10);
+        this.keys = [...new Set(this.keys)].filter(k => k && k.length > 10);
         console.log(`[GeminiService] Loaded ${this.keys.length} API Keys.`);
     }
 
@@ -85,8 +85,8 @@ export const setManualApiKey = (key: string) => {
     keyManager.setManualKey(key);
 };
 
-// Safety Settings
-const SAFETY_SETTINGS = [
+// Safety Settings - Cast to any to avoid TS2322 Enum mismatches during build
+const SAFETY_SETTINGS: any[] = [
     { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
     { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
     { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
