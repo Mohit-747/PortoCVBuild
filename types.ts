@@ -113,13 +113,32 @@ export interface JobListing {
   matchReason?: string; // AI explanation
 }
 
+export interface AcademicTranslation {
+    title: string;
+    hook: string;
+    simplifiedContent: string;
+    keyTakeaways: string[];
+    linkedInPost: string;
+}
+
+export interface ViralPost {
+    style: 'Storytelling' | 'Achievement' | 'Insight' | 'Contrarian';
+    hook: string;
+    body: string;
+    hashtags: string;
+    estimatedViralityScore: number;
+}
+
 export enum AppMode {
+  LANDING = 'LANDING',
   LOGIN = 'LOGIN',
   HOME = 'HOME',
   PORTFOLIO = 'PORTFOLIO',
   UK_RESUME = 'UK_RESUME',
   JOB_HUNTER = 'JOB_HUNTER',
-  RESUME_MOULDER = 'RESUME_MOULDER'
+  RESUME_MOULDER = 'RESUME_MOULDER',
+  ACADEMIC_TRANSLATOR = 'ACADEMIC_TRANSLATOR',
+  LINKEDIN_VIRAL = 'LINKEDIN_VIRAL'
 }
 
 export enum AppStep {

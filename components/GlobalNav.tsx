@@ -15,7 +15,11 @@ export const GlobalNav: React.FC<Props> = ({ currentMode, setMode, currentUser }
     { id: AppMode.PORTFOLIO, label: '3D Site', icon: 'fa-cube' },
     { id: AppMode.JOB_HUNTER, label: 'Jobs', icon: 'fa-search-location' },
     { id: AppMode.RESUME_MOULDER, label: 'Moulder', icon: 'fa-magic' },
+    { id: AppMode.ACADEMIC_TRANSLATOR, label: 'Translator', icon: 'fa-graduation-cap' },
+    { id: AppMode.LINKEDIN_VIRAL, label: 'Viral', icon: 'fa-share-nodes' },
   ];
+
+  if (currentMode === AppMode.LOGIN || currentMode === AppMode.LANDING) return null;
 
   return (
     <nav className="fixed top-0 left-0 right-0 h-20 glass z-[1000] px-6 md:px-10 flex items-center justify-between border-b border-white/5 backdrop-blur-xl bg-slate-950/80">
@@ -24,12 +28,12 @@ export const GlobalNav: React.FC<Props> = ({ currentMode, setMode, currentUser }
             <i className="fas fa-layer-group text-white text-sm"></i>
           </div>
           <div className="hidden md:block">
-            <h1 className="text-xl font-black uppercase leading-none italic tracking-tight text-white">PortoCV</h1>
-            <p className="text-[9px] text-indigo-400 font-bold tracking-[0.4em] uppercase mt-0.5">Studio v2.5</p>
+            <h1 className="text-xl font-black uppercase leading-none italic tracking-tight text-white">Studex</h1>
+            <p className="text-[9px] text-indigo-400 font-bold tracking-[0.4em] uppercase mt-0.5">Empowering Students</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4 bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 overflow-x-auto">
+        <div className="flex items-center gap-2 md:gap-4 bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar">
             {navItems.map(item => (
                 <button
                     key={item.id}

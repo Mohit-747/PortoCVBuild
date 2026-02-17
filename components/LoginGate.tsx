@@ -4,12 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   onLogin: (email: string) => void;
+  onBack: () => void;
 }
 
 const ADMIN_PHONE = "+447899255443";
 const ADMIN_EMAIL = "mohit.bvcoe747@gmail.com";
 
-export const LoginGate: React.FC<Props> = ({ onLogin }) => {
+export const LoginGate: React.FC<Props> = ({ onLogin, onBack }) => {
   const [email, setEmail] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -118,6 +119,12 @@ export const LoginGate: React.FC<Props> = ({ onLogin }) => {
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[150px] rounded-full animate-pulse"></div>
          <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-emerald-600/10 blur-[150px] rounded-full animate-pulse"></div>
+      </div>
+
+      <div className="absolute top-6 left-6 z-20">
+          <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors uppercase font-bold text-xs tracking-widest">
+              <i className="fas fa-arrow-left"></i> Back to Home
+          </button>
       </div>
 
       <motion.div 

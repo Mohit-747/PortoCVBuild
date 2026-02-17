@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 // @ts-ignore
@@ -12,9 +11,12 @@ import { UKResumeBuilder } from './components/UKResumeBuilder';
 import { LoginGate } from './components/LoginGate';
 import { JobHunter } from './components/JobHunter';
 import { ResumeMoulder } from './components/ResumeMoulder';
+import { AcademicTranslator } from './components/AcademicTranslator';
+import { LinkedInViralGenerator } from './components/LinkedInViralGenerator';
 import { GlobalNav } from './components/GlobalNav';
+import { LandingPage } from './components/LandingPage';
 
-const STORAGE_KEY = 'portocv_history_v9_premium';
+const STORAGE_KEY = 'studex_history_v1';
 const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 Minutes
 
 const CreatorBadge = () => (
@@ -39,7 +41,8 @@ const CreatorBadge = () => (
 );
 
 const App: React.FC = () => {
-  const [mode, setMode] = useState<AppMode>(AppMode.LOGIN);
+  // Start at LANDING PAGE
+  const [mode, setMode] = useState<AppMode>(AppMode.LANDING);
   const [currentUser, setCurrentUser] = useState<string>('');
   
   const [step, setStep] = useState<AppStep>(AppStep.INPUT);
@@ -91,8 +94,8 @@ const App: React.FC = () => {
   // SESSION TIMEOUT LOGIC
   useEffect(() => {
     let timer: any;
-    if (mode !== AppMode.LOGIN) {
-      // Start 10 minute timer when not in login screen
+    if (mode !== AppMode.LOGIN && mode !== AppMode.LANDING) {
+      // Start 10 minute timer when not in login/landing screen
       timer = setTimeout(() => {
         setMode(AppMode.LOGIN);
         setCurrentUser('');
@@ -104,8 +107,6 @@ const App: React.FC = () => {
 
   const handleLogin = (email: string) => {
     setCurrentUser(email);
-    // Remove local storage persistence for security in this context
-    // localStorage.setItem('portocv_user_email', email); 
     setMode(AppMode.HOME);
   };
 
@@ -248,9 +249,14 @@ const App: React.FC = () => {
     }
   };
 
+  // --- LANDING VIEW ---
+  if (mode === AppMode.LANDING) {
+      return <LandingPage onStart={() => setMode(AppMode.LOGIN)} />;
+  }
+
   // --- LOGIN VIEW ---
   if (mode === AppMode.LOGIN) {
-    return <LoginGate onLogin={handleLogin} />;
+    return <LoginGate onLogin={handleLogin} onBack={() => setMode(AppMode.LANDING)} />;
   }
 
   // --- WRAPPER FOR LOGGED IN VIEWS ---
@@ -269,13 +275,13 @@ const App: React.FC = () => {
             <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 1, ease: "easeOut" }} className="relative">
               <div className="absolute -inset-10 bg-indigo-500/20 blur-[100px] rounded-full"></div>
               <h1 className="text-8xl md:text-[10rem] font-black uppercase italic leading-none tracking-tighter mb-6 text-transparent bg-clip-text bg-gradient-to-br from-indigo-300 via-white to-cyan-300 drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">
-                  PortoCV
+                  Studex
               </h1>
-              <p className="text-sm md:text-xl font-bold uppercase tracking-[0.6em] text-slate-400/80">The Agentic Design Studio</p>
+              <p className="text-sm md:text-xl font-bold uppercase tracking-[0.6em] text-slate-400/80">Empowering Students</p>
             </motion.div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 w-full px-4 md:px-10">
-              {/* CARD 1: UK RESUME */}
+            <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6 w-full px-4 md:px-10">
+              {/* AGENT 1 */}
               <motion.div 
                 whileHover={{ scale: 1.03, y: -10 }}
                 onClick={() => setMode(AppMode.UK_RESUME)}
@@ -289,7 +295,7 @@ const App: React.FC = () => {
                 </div>
               </motion.div>
 
-              {/* CARD 2: 3D PORTFOLIO */}
+              {/* AGENT 2 */}
               <motion.div 
                 whileHover={{ scale: 1.03, y: -10 }}
                 onClick={() => { setMode(AppMode.PORTFOLIO); setStep(AppStep.INPUT); }}
@@ -303,7 +309,7 @@ const App: React.FC = () => {
                 </div>
               </motion.div>
 
-              {/* CARD 3: JOB HUNTER */}
+              {/* AGENT 3 */}
               <motion.div 
                 whileHover={{ scale: 1.03, y: -10 }}
                 onClick={() => setMode(AppMode.JOB_HUNTER)}
@@ -317,7 +323,7 @@ const App: React.FC = () => {
                 </div>
               </motion.div>
 
-              {/* CARD 4: RESUME MOULDER */}
+              {/* AGENT 4 */}
               <motion.div 
                 whileHover={{ scale: 1.03, y: -10 }}
                 onClick={() => setMode(AppMode.RESUME_MOULDER)}
@@ -331,9 +337,44 @@ const App: React.FC = () => {
                 </div>
               </motion.div>
             </div>
+            
+            {/* ROW 2 */}
+            <div className="grid md:grid-cols-2 gap-6 w-full px-4 md:px-10 mt-6">
+                {/* AGENT 5 */}
+                <motion.div 
+                  whileHover={{ scale: 1.02, y: -5 }}
+                  onClick={() => setMode(AppMode.ACADEMIC_TRANSLATOR)}
+                  className="glass p-8 rounded-[40px] border border-white/5 cursor-pointer group hover:border-amber-500/30 transition-all text-left relative overflow-hidden bg-gradient-to-b from-white/5 to-transparent hover:bg-amber-900/10 shadow-2xl flex flex-row items-center justify-between min-h-[200px]"
+                >
+                  <div className="relative z-10 max-w-sm">
+                    <span className="inline-block px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[9px] font-bold uppercase tracking-widest mb-4">Agent 05</span>
+                    <h2 className="text-3xl font-black uppercase italic mb-2 text-white group-hover:text-amber-300 transition-colors">Academic Translator</h2>
+                    <p className="text-slate-400 text-xs leading-relaxed">Turn your Dissertation & Essays into Viral Case Studies.</p>
+                  </div>
+                  <div className="hidden md:flex items-center justify-center w-24 h-24 bg-amber-500/10 rounded-full border border-amber-500/20 group-hover:scale-110 transition-transform">
+                      <i className="fas fa-graduation-cap text-4xl text-amber-500"></i>
+                  </div>
+                </motion.div>
+
+                {/* AGENT 6 */}
+                <motion.div 
+                  whileHover={{ scale: 1.02, y: -5 }}
+                  onClick={() => setMode(AppMode.LINKEDIN_VIRAL)}
+                  className="glass p-8 rounded-[40px] border border-white/5 cursor-pointer group hover:border-blue-500/30 transition-all text-left relative overflow-hidden bg-gradient-to-b from-white/5 to-transparent hover:bg-blue-900/10 shadow-2xl flex flex-row items-center justify-between min-h-[200px]"
+                >
+                  <div className="relative z-10 max-w-sm">
+                    <span className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-widest mb-4">Agent 06</span>
+                    <h2 className="text-3xl font-black uppercase italic mb-2 text-white group-hover:text-blue-300 transition-colors">Viral Creator</h2>
+                    <p className="text-slate-400 text-xs leading-relaxed">Generate high-engagement LinkedIn posts from your resume.</p>
+                  </div>
+                  <div className="hidden md:flex items-center justify-center w-24 h-24 bg-blue-500/10 rounded-full border border-blue-500/20 group-hover:scale-110 transition-transform">
+                      <i className="fas fa-share-nodes text-4xl text-blue-500"></i>
+                  </div>
+                </motion.div>
+            </div>
 
             {history.length > 0 && (
-              <div className="pt-10 border-t border-white/5 w-full">
+              <div className="pt-10 border-t border-white/5 w-full mt-10">
                   <h3 className="text-xs font-black uppercase tracking-[0.5em] text-slate-500 mb-8">Recent Deployments</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     {history.map(item => (
@@ -414,6 +455,22 @@ const App: React.FC = () => {
              resumeData={ukResumeData} 
              setResumeData={setUkResumeData}
            />
+         </div>
+      )}
+      
+      {/* ACADEMIC TRANSLATOR VIEW */}
+      {mode === AppMode.ACADEMIC_TRANSLATOR && (
+         <div className="min-h-screen bg-[#0f172a] text-white">
+           <ThreeBackground variant="grid" primaryColor="#d97706" accentColor="#f59e0b" backgroundColor="#0f172a" />
+           <AcademicTranslator onBack={() => setMode(AppMode.HOME)} />
+         </div>
+      )}
+
+      {/* LINKEDIN VIRAL VIEW */}
+      {mode === AppMode.LINKEDIN_VIRAL && (
+         <div className="min-h-screen bg-[#0f172a] text-white">
+           <ThreeBackground variant="particles" primaryColor="#3b82f6" accentColor="#60a5fa" backgroundColor="#0f172a" />
+           <LinkedInViralGenerator onBack={() => setMode(AppMode.HOME)} />
          </div>
       )}
 
@@ -579,6 +636,24 @@ const App: React.FC = () => {
                 </motion.div>
               )}
 
+              {step === AppStep.GENERATING && (
+                <motion.div key="generating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen flex flex-col items-center justify-center text-center px-6 z-50 relative">
+                    <div className="relative w-40 h-40 mb-12">
+                        <div className="absolute inset-0 border-t-4 border-indigo-500 rounded-full animate-spin"></div>
+                        <div className="absolute inset-4 border-r-4 border-purple-500 rounded-full animate-spin-slow"></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <i className="fas fa-cube text-5xl text-white/20 animate-pulse"></i>
+                        </div>
+                    </div>
+                    <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter text-white mb-6">
+                        {loadingMsg || "Constructing..."}
+                    </h2>
+                    <p className="text-indigo-400 text-sm font-bold uppercase tracking-[0.5em] animate-pulse">
+                        {motivationalQuote || "Agent 1 is working..."}
+                    </p>
+                </motion.div>
+              )}
+
               {step === AppStep.PREVIEW && portfolio && (
                 <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pb-32 relative">
                   
@@ -634,9 +709,20 @@ const App: React.FC = () => {
                       <div className="space-y-6">
                         <i className="fab fa-github text-8xl text-indigo-400 mb-4 block drop-shadow-[0_0_30px_rgba(99,102,241,0.5)]"></i>
                         <h2 className="text-5xl font-black uppercase italic tracking-tighter text-white">Connect GitHub</h2>
-                        <p className="text-slate-400 text-sm leading-relaxed max-w-md mx-auto">
-                            To deploy, you need a <b>GitHub Personal Access Token (Classic)</b> with <b>'repo'</b> scope.
-                        </p>
+                        
+                        <div className="text-left bg-slate-900/50 p-6 rounded-2xl border border-white/5 space-y-3">
+                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">How to get a key:</p>
+                            <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside marker:text-indigo-500">
+                                <li>Log in to GitHub and go to <b>Settings</b></li>
+                                <li>Select <b>Developer settings</b> &gt; <b>Personal access tokens</b> &gt; <b>Tokens (classic)</b></li>
+                                <li>Click <b>Generate new token (classic)</b></li>
+                                <li>Check the <b>'repo'</b> scope (Full control of private repositories)</li>
+                                <li>Copy the generated token (starts with <code>ghp_</code>)</li>
+                            </ol>
+                            <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="block text-center mt-4 text-[10px] uppercase font-bold text-indigo-400 hover:text-white transition-colors">
+                                Open GitHub Settings <i className="fas fa-external-link-alt ml-1"></i>
+                            </a>
+                        </div>
                       </div>
                       <input 
                         type="password" 

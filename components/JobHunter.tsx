@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 // @ts-ignore
@@ -172,198 +171,206 @@ export const JobHunter: React.FC<Props> = ({ onBack, resumeData, setResumeData }
         KEY SKILLS: ${resumeData.coreCompetencies.join(', ')}
         TONE: Enthusiastic, Professional, British English.`,
     });
-    setCoverLetter(response.text || "Failed to generate.");
+    // Normalize newlines
+    const rawText = response.text || "Failed to generate.";
+    setCoverLetter(rawText.split(/\\n|\n/).join('\n'));
   };
 
   const handleMouldResume = async () => {
     if (!resumeData || !selectedJob) return;
     setMoulding(true);
     try {
-        const result = await tailorResumeToJob(resumeData, selectedJob.description, selectedJob.title);
-        setMouldResult({
-            success: result.success,
-            score: result.matchScore,
-            analysis: result.analysis,
-            data: result.data || undefined
-        });
-    } catch (e) {
-        alert("Agent 4 encountered an issue.");
+      const res = await tailorResumeToJob(resumeData, selectedJob.description, selectedJob.title);
+      setMouldResult({
+        score: res.matchScore,
+        analysis: res.analysis,
+        success: res.success,
+        data: res.data || undefined
+      });
+    } catch (e: any) {
+      alert("Moulding failed: " + e.message);
     } finally {
-        setMoulding(false);
+      setMoulding(false);
     }
   };
 
-  const handleDownloadMoulded = () => {
-      if(!mouldResult?.data) return;
-      const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(JSON.stringify(mouldResult.data, null, 2))}`;
-      const link = document.createElement("a");
-      link.href = jsonString;
-      link.download = `Tailored_Resume_${selectedJob?.company.replace(/\s/g,'_')}.json`;
-      link.click();
-      alert("JSON Downloaded! You can import this back into the UK Resume Architect to view/edit PDF.");
-  };
+  return (
+    <div className="min-h-screen pt-28 px-6 pb-20">
+        <div className="max-w-7xl mx-auto h-full">
+            {/* Header */}
+            <div className="flex justify-between items-end mb-8">
+                <div>
+                    <button onClick={onBack} className="text-slate-400 hover:text-white flex items-center gap-2 mb-4 font-bold uppercase text-xs tracking-wider">
+                        <i className="fas fa-arrow-left"></i> Return to Hub
+                    </button>
+                    <h1 className="text-5xl md:text-6xl font-black uppercase italic tracking-tighter text-white">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-500">Agent 03</span> Job Hunter
+                    </h1>
+                </div>
+                {!resumeData && (
+                     <div onClick={() => fileInputRef.current?.click()} className="cursor-pointer bg-slate-800 hover:bg-slate-700 px-6 py-3 rounded-xl border border-white/10 flex items-center gap-3 transition-all">
+                        <i className="fas fa-upload text-pink-500"></i>
+                        <span className="text-xs font-bold uppercase text-white">Upload Resume to Start</span>
+                        <input type="file" ref={fileInputRef} className="hidden" onChange={handleResumeUpload} accept=".pdf,.docx,.doc,.txt" />
+                     </div>
+                )}
+            </div>
 
-  if (!resumeData && !loading) {
-     return (
-        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6 pt-24">
-            <div className="glass p-12 rounded-[50px] border-pink-500/20 shadow-[0_0_100px_rgba(236,72,153,0.1)] text-center max-w-xl">
-               <div className="w-24 h-24 bg-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl">
-                   <i className="fas fa-search-location text-4xl text-white"></i>
-               </div>
-               <h1 className="text-4xl font-black uppercase italic tracking-tighter text-white mb-4">Job Hunter Access</h1>
-               <p className="text-slate-400 mb-8">Agent 3 needs your resume data to perform matches and Agent 4 needs it to tailor your CV.</p>
-               
-               <div onClick={() => fileInputRef.current?.click()} className="p-10 border-2 border-dashed border-white/10 rounded-3xl cursor-pointer hover:border-pink-500 hover:bg-pink-500/5 transition-all group">
-                   <i className="fas fa-cloud-upload-alt text-4xl text-slate-500 mb-4 group-hover:text-pink-400 transition-colors"></i>
-                   <p className="font-bold uppercase tracking-widest text-xs text-slate-400">Upload Current Resume</p>
-               </div>
-               <input type="file" ref={fileInputRef} className="hidden" onChange={handleResumeUpload} accept=".pdf,.docx,.doc,.txt" />
+            <div className="grid lg:grid-cols-12 gap-8 h-[calc(100vh-250px)]">
+                {/* LEFT: LIST */}
+                <div className="lg:col-span-4 flex flex-col gap-4 h-full">
+                    <div className="glass p-4 rounded-2xl flex gap-4 items-center">
+                        <i className="fas fa-search text-slate-500 ml-2"></i>
+                        <input 
+                           type="text" 
+                           placeholder="Location (e.g. Leeds)..." 
+                           className="bg-transparent border-none outline-none text-white text-sm w-full placeholder-slate-600"
+                           value={filters.location}
+                           onChange={(e) => setFilters({...filters, location: e.target.value})}
+                           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                        />
+                        <button onClick={handleSearch} className="px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded-lg text-[10px] font-bold uppercase transition-all text-white">
+                           Search
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 scrollbar-thin">
+                        {loading ? (
+                            <div className="text-center py-10 opacity-50">
+                                <i className="fas fa-circle-notch fa-spin text-2xl text-pink-500 mb-2"></i>
+                                <p className="text-xs uppercase font-bold">Scanning Job Boards...</p>
+                            </div>
+                        ) : jobs.length === 0 ? (
+                            <div className="text-center py-10 opacity-50">
+                                <p className="text-xs uppercase font-bold">No jobs found.</p>
+                            </div>
+                        ) : (
+                            jobs.map(job => (
+                                <motion.div 
+                                   key={job.id}
+                                   layoutId={job.id}
+                                   onClick={() => setSelectedJob(job)}
+                                   className={`p-6 rounded-2xl border cursor-pointer transition-all ${selectedJob?.id === job.id ? 'bg-pink-500/10 border-pink-500' : 'bg-slate-900/40 border-white/5 hover:bg-slate-800'}`}
+                                >
+                                    <h3 className="font-bold text-white text-lg leading-tight mb-1">{job.title}</h3>
+                                    <p className="text-pink-400 text-xs font-bold uppercase tracking-wider mb-2">{job.company}</p>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[10px] text-slate-500 bg-white/5 px-2 py-1 rounded">{job.type}</span>
+                                        {job.matchScore && (
+                                            <span className={`text-xs font-bold ${job.matchScore >= 80 ? 'text-emerald-400' : job.matchScore >= 60 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                                {job.matchScore}% Match
+                                            </span>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                {/* RIGHT: DETAILS */}
+                <div className="lg:col-span-8 h-full flex flex-col">
+                    {selectedJob ? (
+                        <div className="glass rounded-[40px] border border-white/10 h-full flex flex-col relative overflow-hidden">
+                             {/* Job Content */}
+                             <div className="p-8 md:p-12 overflow-y-auto flex-1 scrollbar-thin">
+                                 <span className="inline-block px-3 py-1 bg-pink-500/20 text-pink-400 rounded-lg text-[10px] font-bold uppercase tracking-widest mb-6">Selected Role</span>
+                                 <h2 className="text-4xl font-black uppercase italic text-white mb-2">{selectedJob.title}</h2>
+                                 <div className="flex gap-6 text-sm text-slate-400 mb-8 border-b border-white/5 pb-8">
+                                     <span><i className="fas fa-building mr-2"></i>{selectedJob.company}</span>
+                                     <span><i className="fas fa-map-marker-alt mr-2"></i>{selectedJob.location}</span>
+                                     <span><i className="far fa-clock mr-2"></i>{selectedJob.postedAt}</span>
+                                 </div>
+
+                                 {/* Match Analysis */}
+                                 {selectedJob.matchReason && (
+                                     <div className="mb-8 p-6 bg-slate-900/50 rounded-2xl border border-white/5">
+                                         <h4 className="text-xs font-bold uppercase text-pink-400 mb-2">Agent Analysis</h4>
+                                         <p className="text-slate-300 text-sm italic">"{selectedJob.matchReason}"</p>
+                                     </div>
+                                 )}
+
+                                 <div className="prose prose-invert max-w-none mb-12">
+                                     <p className="text-slate-300 leading-relaxed">{selectedJob.description}</p>
+                                 </div>
+                                 
+                                 {/* ACTIONS */}
+                                 <div className="grid grid-cols-2 gap-6">
+                                     <button 
+                                        onClick={() => generateApplication(selectedJob)}
+                                        className="p-6 bg-slate-800 hover:bg-slate-700 rounded-2xl border border-white/10 text-left group transition-all"
+                                     >
+                                         <i className="fas fa-envelope-open-text text-2xl text-pink-400 mb-4 group-hover:scale-110 transition-transform"></i>
+                                         <h3 className="font-bold text-white text-sm uppercase">Draft Cover Letter</h3>
+                                         <p className="text-[10px] text-slate-500 mt-1">Agent 3 writes a custom email</p>
+                                     </button>
+
+                                     <button 
+                                        onClick={handleMouldResume}
+                                        disabled={moulding}
+                                        className="p-6 bg-slate-800 hover:bg-slate-700 rounded-2xl border border-white/10 text-left group transition-all"
+                                     >
+                                         <i className={`fas fa-magic text-2xl text-purple-400 mb-4 ${moulding ? 'fa-spin' : 'group-hover:scale-110'} transition-transform`}></i>
+                                         <h3 className="font-bold text-white text-sm uppercase">Mould Resume</h3>
+                                         <p className="text-[10px] text-slate-500 mt-1">Agent 4 tailors your CV to this job</p>
+                                     </button>
+                                 </div>
+
+                                 {/* RESULTS DISPLAY */}
+                                 {coverLetter && (
+                                     <div className="mt-8 pt-8 border-t border-white/5 animate-in fade-in slide-in-from-bottom-4">
+                                         <h4 className="text-xs font-bold uppercase text-slate-500 mb-4 flex justify-between">
+                                             <span>Generated Application</span>
+                                             <button onClick={() => navigator.clipboard.writeText(coverLetter)} className="hover:text-white">Copy</button>
+                                         </h4>
+                                         <textarea 
+                                             readOnly 
+                                             value={coverLetter}
+                                             className="w-full h-64 bg-slate-950/50 border border-white/10 rounded-xl p-6 text-sm text-slate-300 leading-relaxed outline-none resize-none"
+                                         />
+                                     </div>
+                                 )}
+                                 
+                                 {mouldResult && (
+                                     <div className="mt-8 pt-8 border-t border-white/5 animate-in fade-in slide-in-from-bottom-4">
+                                         <h4 className="text-xs font-bold uppercase text-purple-400 mb-4">Resume Moulding Result</h4>
+                                         <div className={`p-4 rounded-xl border ${mouldResult.success ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'}`}>
+                                             <div className="flex justify-between items-center mb-2">
+                                                 <span className={`font-bold ${mouldResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                     {mouldResult.success ? 'Optimization Complete' : 'Optimization Failed'}
+                                                 </span>
+                                                 <span className="text-xs font-bold bg-black/20 px-2 py-1 rounded text-white">{mouldResult.score}% Match</span>
+                                             </div>
+                                             <p className="text-xs text-slate-300 italic mb-4">{mouldResult.analysis}</p>
+                                             {mouldResult.success && mouldResult.data && (
+                                                 <button 
+                                                    onClick={() => setResumeData(mouldResult.data!)}
+                                                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-xs font-bold uppercase text-white shadow-lg"
+                                                 >
+                                                     Use this Tailored Resume
+                                                 </button>
+                                             )}
+                                         </div>
+                                     </div>
+                                 )}
+                             </div>
+                             
+                             <div className="p-6 bg-slate-900/80 border-t border-white/5 flex justify-between items-center backdrop-blur-md">
+                                 <span className="text-xs font-bold text-slate-500">Apply directly on company site</span>
+                                 <a href={selectedJob.applyLink} target="_blank" rel="noreferrer" className="px-8 py-3 bg-pink-600 hover:bg-pink-500 rounded-xl text-xs font-bold uppercase text-white shadow-lg shadow-pink-500/20 transition-all">
+                                     Apply Now <i className="fas fa-external-link-alt ml-2"></i>
+                                 </a>
+                             </div>
+                        </div>
+                    ) : (
+                        <div className="glass rounded-[40px] border border-white/10 h-full flex flex-col items-center justify-center text-center opacity-50 p-12">
+                             <i className="fas fa-mouse-pointer text-4xl mb-4 text-slate-600"></i>
+                             <p className="font-bold uppercase tracking-widest text-sm text-slate-500">Select a job to view details</p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
-     )
-  }
-
-  return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 pt-28 px-6 pb-20">
-       <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-center mb-12 gap-6">
-             <div>
-                <button onClick={onBack} className="text-slate-400 hover:text-white flex items-center gap-2 mb-4 font-bold uppercase text-xs tracking-wider">
-                   <i className="fas fa-arrow-left"></i> Return to Hub
-                </button>
-                <h1 className="text-5xl md:text-6xl font-black uppercase italic tracking-tighter text-white">
-                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-500">Agent 03</span> Job Hunter
-                </h1>
-                <p className="text-slate-400 mt-2 font-medium">Real-time matching & Auto-Drafting applications.</p>
-             </div>
-             
-             {/* Filters */}
-             <div className="glass p-4 rounded-2xl flex flex-wrap gap-4 items-center">
-                 <div className="flex items-center gap-2 bg-slate-900/50 px-4 py-2 rounded-xl border border-white/5">
-                    <i className="fas fa-map-marker-alt text-pink-500"></i>
-                    <select value={filters.location} onChange={(e) => setFilters({...filters, location: e.target.value})} className="bg-transparent outline-none text-xs font-bold uppercase tracking-wider text-white">
-                       <option value="Leeds">Leeds</option>
-                       <option value="Manchester">Manchester</option>
-                       <option value="London">London</option>
-                       <option value="Remote">Remote</option>
-                    </select>
-                 </div>
-                 <button onClick={handleSearch} className="px-6 py-2 bg-pink-600 hover:bg-pink-500 rounded-xl font-bold uppercase text-xs tracking-widest shadow-lg shadow-pink-500/20 transition-all">
-                    {loading ? <i className="fas fa-spin fa-spinner"></i> : 'Fetch Jobs'}
-                 </button>
-             </div>
-          </div>
-
-          <div className="grid lg:grid-cols-12 gap-8">
-              {/* Job List */}
-              <div className="lg:col-span-5 space-y-4">
-                 {loading && <div className="text-center py-20 text-slate-500 animate-pulse font-bold uppercase tracking-widest">Scouring Job Boards...</div>}
-                 
-                 {!loading && jobs.length === 0 && (
-                     <div className="p-8 glass rounded-3xl text-center border-2 border-dashed border-white/5">
-                         <i className="fas fa-ghost text-4xl text-slate-600 mb-4"></i>
-                         <p className="text-xs font-bold uppercase tracking-widest text-slate-400">No jobs found matching &gt;= 60%</p>
-                     </div>
-                 )}
-
-                 {!loading && jobs.map(job => (
-                    <motion.div 
-                       key={job.id} layoutId={job.id} onClick={() => { setSelectedJob(job); generateApplication(job); }}
-                       className={`p-6 rounded-3xl border cursor-pointer transition-all group relative overflow-hidden ${selectedJob?.id === job.id ? 'bg-pink-600/10 border-pink-500/50' : 'glass border-white/5 hover:bg-white/5'}`}
-                    >
-                       {job.matchScore && (
-                          <div className="absolute top-4 right-4 flex items-center gap-1">
-                             <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">{job.matchScore}% Match</div>
-                             <div className="w-8 h-1 bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-emerald-400" style={{ width: `${job.matchScore}%` }}></div></div>
-                          </div>
-                       )}
-                       <h3 className="text-lg font-bold text-white mb-1 group-hover:text-pink-400 transition-colors">{job.title}</h3>
-                       <div className="flex gap-2 text-xs font-bold text-slate-400 uppercase tracking-wide mb-3"><span>{job.company}</span> • <span>{job.type}</span></div>
-                       <p className="text-xs text-slate-500 line-clamp-2">{job.description}</p>
-                       {job.matchReason && <div className="mt-3 text-[10px] text-emerald-300/80 italic border-t border-white/5 pt-2"><i className="fas fa-robot mr-1"></i> "{job.matchReason}"</div>}
-                    </motion.div>
-                 ))}
-              </div>
-
-              {/* Action Panel */}
-              <div className="lg:col-span-7">
-                  {selectedJob ? (
-                     <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="glass p-8 rounded-[40px] border border-white/10 sticky top-28 min-h-[500px] flex flex-col">
-                        <div className="flex justify-between items-start mb-6">
-                           <div>
-                              <h2 className="text-3xl font-black uppercase italic text-white mb-2">{selectedJob.title}</h2>
-                              <p className="text-xl text-pink-400 font-bold">{selectedJob.company}</p>
-                           </div>
-                           <a href={selectedJob.applyLink} target="_blank" rel="noreferrer" className="px-6 py-3 bg-white text-black rounded-xl font-bold uppercase text-xs tracking-widest hover:scale-105 transition-transform">Apply Externally <i className="fas fa-external-link-alt ml-2"></i></a>
-                        </div>
-
-                        {/* AGENT 4 SECTION */}
-                        <div className="mb-8 p-6 bg-slate-900/60 rounded-3xl border border-white/10 relative overflow-hidden">
-                            <div className="flex items-center justify-between mb-4 relative z-10">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                                        <i className="fas fa-magic text-white text-xs"></i>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-bold uppercase text-white tracking-wide">Agent 4: Resume Moulder</h4>
-                                        <p className="text-[10px] text-slate-400 uppercase tracking-widest">Tailor CV to Job Description</p>
-                                    </div>
-                                </div>
-                                {!mouldResult ? (
-                                    <button 
-                                        onClick={handleMouldResume} 
-                                        disabled={moulding}
-                                        className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50"
-                                    >
-                                        {moulding ? <i className="fas fa-spin fa-circle-notch"></i> : 'Run Moulding'}
-                                    </button>
-                                ) : (
-                                    <div className="flex gap-2">
-                                        <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase ${mouldResult.success ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                            Score: {mouldResult.score}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            {mouldResult && (
-                                <div className="relative z-10">
-                                    <p className="text-xs text-slate-300 italic mb-3">"{mouldResult.analysis}"</p>
-                                    {mouldResult.success ? (
-                                        <div className="flex gap-3">
-                                            <button onClick={handleDownloadMoulded} className="flex-1 py-2 bg-emerald-600/20 border border-emerald-500/50 text-emerald-400 rounded-lg text-xs font-bold uppercase hover:bg-emerald-600 hover:text-white transition-colors">
-                                                <i className="fas fa-download mr-2"></i> Download Tailored JSON
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <p className="text-[10px] text-red-400 font-bold uppercase tracking-wide">Score too low to auto-mould (Needs &gt;60%)</p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Cover Letter Draft */}
-                        <div className="flex-1 flex flex-col">
-                           <div className="flex items-center justify-between mb-2">
-                              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500"><i className="fas fa-pen-fancy mr-2"></i>Agent 3 Draft</label>
-                              <button onClick={() => {navigator.clipboard.writeText(coverLetter); alert("Copied!");}} className="text-[10px] font-bold uppercase text-pink-400 hover:text-white">Copy Text</button>
-                           </div>
-                           <textarea className="flex-1 w-full bg-slate-950/50 rounded-2xl p-6 text-sm leading-relaxed text-slate-300 border border-white/10 outline-none focus:border-pink-500 transition-colors resize-none font-serif" value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} />
-                           <div className="mt-4 flex justify-end">
-                              <a href={`mailto:hiring@${selectedJob.company.replace(/\s/g, '').toLowerCase()}.com?subject=Application for ${selectedJob.title}&body=${encodeURIComponent(coverLetter)}`} className="px-8 py-3 bg-pink-600 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20">Open Email Client <i className="fas fa-paper-plane ml-2"></i></a>
-                           </div>
-                        </div>
-                     </motion.div>
-                  ) : (
-                     <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4 border-2 border-dashed border-white/5 rounded-[40px]">
-                        <i className="fas fa-briefcase text-6xl opacity-20"></i>
-                        <p className="font-bold uppercase tracking-widest text-xs">Select a job to activate Agent 3</p>
-                     </div>
-                  )}
-              </div>
-          </div>
-       </div>
     </div>
   );
 };

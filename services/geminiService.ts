@@ -1,36 +1,91 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { PortfolioData, QAFeedback, UserPreferences, UKResumeData } from "../types";
+import { PortfolioData, QAFeedback, UserPreferences, UKResumeData, AcademicTranslation, ViralPost } from "../types";
 
-// --- API KEY ROTATION & SANITIZATION LOGIC ---
+// --- API KEY MANAGEMENT & ROTATION LOGIC ---
 
-// Helper to clean keys (remove whitespace, quotes added by some env managers)
-const sanitizeKey = (key: string | undefined) => {
-    if (!key) return '';
-    return key.trim().replace(/^["']|["']$/g, '');
-};
+class KeyManager {
+    private keys: string[] = [];
+    private currentIndex: number = 0;
+    private manualKey: string = '';
 
-let manualKey = '';
+    constructor() {
+        this.loadKeys();
+    }
+
+    private loadKeys() {
+        // 1. Load Manual Key if set
+        if (this.manualKey) {
+            this.keys.push(this.manualKey);
+        }
+
+        // 2. Load standard process.env.API_KEY
+        if (process.env.API_KEY && !process.env.API_KEY.startsWith("AIzaSy...Paste")) {
+            this.keys.push(this.sanitize(process.env.API_KEY));
+        }
+
+        // 3. Load VITE_ specific keys (Standard for Vercel/Vite)
+        // Checks VITE_API_KEY, and VITE_API_KEY_1 through VITE_API_KEY_10
+        // Fix: Cast import.meta to any to avoid TypeScript error regarding 'env' property
+        const env = (import.meta as any).env || process.env || {};
+        
+        if (env.VITE_API_KEY) this.keys.push(this.sanitize(env.VITE_API_KEY));
+        
+        // Check for comma separated list
+        if (env.VITE_API_KEYS) {
+            const list = (env.VITE_API_KEYS as string).split(',');
+            list.forEach(k => this.keys.push(this.sanitize(k)));
+        }
+
+        // Check for indexed keys (VITE_API_KEY_1, VITE_API_KEY_2...)
+        for (let i = 1; i <= 10; i++) {
+            const k = env[`VITE_API_KEY_${i}`];
+            if (k) this.keys.push(this.sanitize(k as string));
+        }
+
+        // Deduplicate
+        this.keys = [...new Set(this.keys)].filter(k => k.length > 10);
+        console.log(`[GeminiService] Loaded ${this.keys.length} API Keys.`);
+    }
+
+    private sanitize(key: string | undefined): string {
+        if (!key) return '';
+        return key.trim().replace(/^["']|["']$/g, '');
+    }
+
+    public setManualKey(key: string) {
+        this.manualKey = this.sanitize(key);
+        // Add to front of queue
+        this.keys.unshift(this.manualKey);
+        this.currentIndex = 0;
+    }
+
+    public getCurrentKey(): string {
+        if (this.keys.length === 0) {
+             throw new Error("API_KEY_MISSING: No valid API Keys found. Please add VITE_API_KEY in Vercel settings or enter manually.");
+        }
+        return this.keys[this.currentIndex];
+    }
+
+    public rotateKey() {
+        if (this.keys.length > 1) {
+            this.currentIndex = (this.currentIndex + 1) % this.keys.length;
+            console.warn(`[GeminiService] Rotating to Key Index: ${this.currentIndex}`);
+        }
+    }
+
+    public getActiveKeyCount(): number {
+        return this.keys.length;
+    }
+}
+
+const keyManager = new KeyManager();
 
 export const setManualApiKey = (key: string) => {
-    manualKey = sanitizeKey(key);
+    keyManager.setManualKey(key);
 };
 
-const getEnvKey = () => sanitizeKey(process.env.API_KEY);
-
-const getCurrentApiKey = () => {
-  // Prioritize manual key if set by user in UI
-  if (manualKey && manualKey.length > 10) return manualKey;
-
-  const envKey = getEnvKey();
-  if (envKey && envKey.length > 10 && !envKey.startsWith("AIzaSy...Paste")) {
-      return envKey;
-  }
-  
-  throw new Error("API_KEY_MISSING: Please enter your Google Gemini API Key.");
-};
-
-// Safety Settings to prevent false positives on Resume content
+// Safety Settings
 const SAFETY_SETTINGS = [
     { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
     { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -39,33 +94,34 @@ const SAFETY_SETTINGS = [
 ];
 
 // Generic wrapper for all AI calls to handle failover
-async function callWithRetry<T>(fn: (ai: GoogleGenAI) => Promise<T>, retries = 1, delay = 1000): Promise<T> {
+async function callWithRetry<T>(fn: (ai: GoogleGenAI) => Promise<T>, retries = 3, delay = 1000): Promise<T> {
   try {
-    const apiKey = getCurrentApiKey();
+    const apiKey = keyManager.getCurrentKey();
     const ai = new GoogleGenAI({ apiKey });
     return await fn(ai);
   } catch (error: any) {
-    // 1. Check for Quota Exceeded (429)
     const isQuotaError = error.status === 429 || 
                          (error.message && error.message.includes('429')) ||
                          (error.message && error.message.toLowerCase().includes('quota')) ||
                          (error.message && error.message.includes('RESOURCE_EXHAUSTED'));
-
-    if (isQuotaError) {
-       throw new Error("429 Resource Exhausted: Your API Key quota is full.");
-    }
-
-    // 2. Check for Invalid Key (400)
-    if (error.status === 400 || (error.message && error.message.includes('API key not valid'))) {
-         throw new Error("400 Invalid API Key: Please check your API Key.");
-    }
     
-    // Check for missing key explicitly
-    if (error.message && error.message.includes('API_KEY_MISSING')) {
-        throw error;
+    const isAuthError = error.status === 400 || (error.message && error.message.includes('API key not valid'));
+
+    // If Quota or Auth error, Rotate key and retry immediately
+    if (isQuotaError || isAuthError) {
+        if (keyManager.getActiveKeyCount() > 1) {
+            console.warn("API Key Exhausted or Invalid. Rotating...");
+            keyManager.rotateKey();
+            // Retry with new key (decrement retries to avoid infinite loops if all keys are bad)
+            if (retries > 0) {
+                return callWithRetry(fn, retries - 1, 500); 
+            }
+        } else {
+             throw new Error("429 Resource Exhausted: Your API Key quota is full and no backup keys are available.");
+        }
     }
 
-    // 3. Standard exponential backoff for server errors
+    // Standard exponential backoff for server errors (500, 503)
     if (retries > 0 && (error.status === 500 || error.message?.includes('500') || error.message?.includes('fetch failed'))) {
       await new Promise(resolve => setTimeout(resolve, delay));
       return callWithRetry(fn, retries - 1, delay * 2);
@@ -82,7 +138,6 @@ export const generatePortfolioData = async (
   prefs: UserPreferences
 ): Promise<PortfolioData> => {
   return callWithRetry(async (ai) => {
-    // Construct the guidance prompt based on user preferences
     let styleGuidance = "";
     if (prefs.themeStyle !== 'auto') styleGuidance += `VISUAL STYLE: Strictly use a '${prefs.themeStyle}' aesthetic (colors, fonts). `;
     if (prefs.backgroundType !== 'auto') styleGuidance += `BACKGROUND: Strictly use '${prefs.backgroundType}' mode. `;
@@ -131,7 +186,7 @@ OUTPUT: Strict JSON only.` }
       model: "gemini-3-pro-preview",
       contents: { parts },
       config: {
-        temperature: 1.0, // Increased temperature for uniqueness
+        temperature: 1.0, 
         responseMimeType: "application/json",
         safetySettings: SAFETY_SETTINGS,
         responseSchema: {
@@ -366,7 +421,6 @@ export const tailorResumeToJob = async (
   jobTitle: string
 ): Promise<{ success: boolean; data: UKResumeData | null; matchScore: number; analysis: string }> => {
   return callWithRetry(async (ai) => {
-    // Step 1: Analyze and rewrite if match > 60%
     const prompt = `
       ACT AS AGENT 4: THE RESUME MOULDER.
       
@@ -414,4 +468,139 @@ export const tailorResumeToJob = async (
       data: result.mouldedResume
     };
   });
+};
+
+// --- ACADEMIC TRANSLATOR (AGENT 5) ---
+
+export const transformAcademicToBlog = async (
+  paperInput: string | { data: string; mimeType: string }
+): Promise<AcademicTranslation> => {
+    return callWithRetry(async (ai) => {
+        const parts: any[] = [
+            { text: `ACT AS AGENT 5: THE ACADEMIC TRANSLATOR.
+            
+            YOUR GOAL: Take a dense Academic Dissertation, Essay, or Research Paper and transform it into a HIGH-IMPACT LinkedIn Post and a Technical Blog Article (Case Study).
+            
+            AUDIENCE: Recruiters, Tech Leads, and Industry Professionals. They do not want academic jargon. They want results, methodologies, and commercial viability.
+            
+            INSTRUCTIONS:
+            1. Extract the Core Thesis.
+            2. Simplify the Language: Remove "academic fluff". Use active voice.
+            3. Structure:
+               - Catchy Title (Clickbait but professional)
+               - Hook (2 sentences)
+               - Simplified Content (The "Case Study" body - max 300 words)
+               - Key Takeaways (Bullet points)
+               - Viral LinkedIn Post (Ready to copy-paste with hashtags)
+
+            OUTPUT JSON:
+            {
+               "title": "...",
+               "hook": "...",
+               "simplifiedContent": "...",
+               "keyTakeaways": ["...", "..."],
+               "linkedInPost": "..."
+            }
+            `}
+        ];
+
+        if (typeof paperInput === 'string') {
+            parts.push({ text: `ACADEMIC TEXT: ${paperInput.slice(0, 25000)}` });
+        } else {
+            parts.push({ inlineData: { data: paperInput.data, mimeType: paperInput.mimeType } });
+        }
+
+        const response = await ai.models.generateContent({
+            model: "gemini-3-pro-preview",
+            contents: { parts },
+            config: {
+                responseMimeType: "application/json",
+                safetySettings: SAFETY_SETTINGS,
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        title: { type: Type.STRING },
+                        hook: { type: Type.STRING },
+                        simplifiedContent: { type: Type.STRING },
+                        keyTakeaways: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        linkedInPost: { type: Type.STRING }
+                    },
+                    required: ["title", "hook", "simplifiedContent", "keyTakeaways", "linkedInPost"]
+                }
+            }
+        });
+
+        if(!response.text) throw new Error("Agent 5 failed to translate academic text.");
+        return JSON.parse(response.text) as AcademicTranslation;
+    });
+};
+
+// --- AGENT 6: VIRAL LINKEDIN GHOSTWRITER ---
+
+export const generateViralPosts = async (
+    sourceInput: string | { data: string; mimeType: string } | null,
+    topics: string,
+    contextDate: string
+): Promise<ViralPost[]> => {
+    return callWithRetry(async (ai) => {
+        let parts: any[] = [
+            { text: `ACT AS AGENT 6: THE VIRAL LINKEDIN GHOSTWRITER.
+            
+            GOAL: Create 4 HIGH-ENGAGEMENT, LONG-FORM LinkedIn Posts.
+            CONTEXT DATE: ${contextDate}
+            TOPICS: ${topics || 'General Tech Trends'}
+            
+            INSTRUCTIONS:
+            1. CONTENT DEPTH: Each post must be DETAILED and STORY-DRIVEN (approx 200-300 words). Do not write short snippets.
+            2. FORMATTING: Use generous spacing (line breaks) for readability. Use bullet points where appropriate.
+            3. STRUCTURE:
+               - THE HOOK: A scroll-stopping first line.
+               - THE STORY/INSIGHT: Deep dive into the "How", "Why", or "What happened".
+               - THE TAKEAWAY: Actionable advice for the reader.
+               - THE CALL TO ACTION: A question to drive comments.
+            
+            STYLES:
+            1. Storytelling (The "Hero's Journey"): Personal struggle -> pivot -> success.
+            2. Achievement/Insight (The "Value Bomb"): Dense, actionable advice or a "How I did X" breakdown.
+            3. Contrarian (The "Pattern Interrupt"): "Unpopular opinion: X is dead."
+            4. Trend/News (The "Newsjacker"): Relevant to current events in the field.
+
+            OUTPUT: JSON Array of 4 objects.
+            `}
+        ];
+
+        if (sourceInput) {
+            if (typeof sourceInput === 'string') {
+                parts.push({ text: `SOURCE TEXT: ${sourceInput.slice(0, 20000)}` });
+            } else {
+                parts.push({ inlineData: { data: sourceInput.data, mimeType: sourceInput.mimeType } });
+            }
+        }
+
+        const response = await ai.models.generateContent({
+            model: "gemini-3-pro-preview",
+            contents: { parts },
+            config: {
+                responseMimeType: "application/json",
+                safetySettings: SAFETY_SETTINGS,
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            style: { type: Type.STRING, enum: ['Storytelling', 'Achievement', 'Insight', 'Contrarian', 'Trend'] },
+                            hook: { type: Type.STRING },
+                            body: { type: Type.STRING, description: "Long-form content, roughly 200 words." },
+                            hashtags: { type: Type.STRING },
+                            estimatedViralityScore: { type: Type.NUMBER }
+                        },
+                        required: ["style", "hook", "body", "hashtags", "estimatedViralityScore"]
+                    }
+                }
+            }
+        });
+
+        if (!response.text) throw new Error("Agent 6 failed to generate posts.");
+        return JSON.parse(response.text) as ViralPost[];
+    });
 };
