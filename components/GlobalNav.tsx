@@ -6,9 +6,10 @@ interface Props {
   currentMode: AppMode;
   setMode: (mode: AppMode) => void;
   currentUser: string;
+  onOpenKeyModal: () => void;
 }
 
-export const GlobalNav: React.FC<Props> = ({ currentMode, setMode, currentUser }) => {
+export const GlobalNav: React.FC<Props> = ({ currentMode, setMode, currentUser, onOpenKeyModal }) => {
   const navItems = [
     { id: AppMode.HOME, label: 'Hub', icon: 'fa-home' },
     { id: AppMode.UK_RESUME, label: 'Resume', icon: 'fa-file-contract' },
@@ -47,6 +48,15 @@ export const GlobalNav: React.FC<Props> = ({ currentMode, setMode, currentUser }
         </div>
 
         <div className="flex items-center gap-4">
+             {/* API Key Emergency Button */}
+             <button 
+                onClick={onOpenKeyModal}
+                className="w-10 h-10 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                title="Enter API Key"
+             >
+                <i className="fas fa-key text-xs"></i>
+             </button>
+
              <div className="hidden md:flex flex-col text-right">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Logged In</span>
                 <span className="text-xs font-bold text-white truncate max-w-[150px]">{currentUser}</span>

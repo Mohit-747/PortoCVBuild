@@ -2,6 +2,23 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { PortfolioData, QAFeedback, UserPreferences, UKResumeData, AcademicTranslation, ViralPost } from "../types";
 
+// --- RATE LIMITER (THROTTLE) ---
+// Google Gemini Free Tier allows ~15 Requests Per Minute (1 req every 4 seconds).
+// We add a client-side delay to prevent accidental bursts from crashing the app.
+const MIN_REQUEST_INTERVAL_MS = 3500; // 3.5 seconds
+let lastRequestTime = 0;
+
+const enforceRateLimit = async () => {
+    const now = Date.now();
+    const timeSinceLast = now - lastRequestTime;
+    if (timeSinceLast < MIN_REQUEST_INTERVAL_MS) {
+        const waitTime = MIN_REQUEST_INTERVAL_MS - timeSinceLast;
+        console.log(`[GeminiService] Throttling request for ${waitTime}ms to respect API quota...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    lastRequestTime = Date.now();
+};
+
 // --- API KEY MANAGEMENT & ROTATION LOGIC ---
 
 class KeyManager {
@@ -14,38 +31,38 @@ class KeyManager {
     }
 
     private loadKeys() {
-        // 1. Load Manual Key if set
-        if (this.manualKey) {
-            this.keys.push(this.manualKey);
-        }
-
-        // 2. Load standard process.env.API_KEY
-        if (process.env.API_KEY && !process.env.API_KEY.startsWith("AIzaSy...Paste")) {
-            this.keys.push(this.sanitize(process.env.API_KEY));
-        }
-
-        // 3. Load VITE_ specific keys (Standard for Vercel/Vite)
-        // Checks VITE_API_KEY, and VITE_API_KEY_1 through VITE_API_KEY_10
-        // We accept both import.meta.env (Vite) and process.env (Polyfilled)
         const env = (import.meta as any).env || process.env || {};
-        
-        if (env.VITE_API_KEY) this.keys.push(this.sanitize(env.VITE_API_KEY));
-        
-        // Check for comma separated list
-        if (env.VITE_API_KEYS) {
-            const list = (env.VITE_API_KEYS as string).split(',');
-            list.forEach(k => this.keys.push(this.sanitize(k)));
+        const candidates: string[] = [];
+
+        // Helper to add keys (handling commas for multiple keys in one var)
+        const add = (val: any) => {
+            if (typeof val === 'string' && val.length > 10 && !val.startsWith("AIzaSy...Paste")) {
+                if (val.includes(',')) {
+                    val.split(',').forEach((k: string) => candidates.push(this.sanitize(k)));
+                } else {
+                    candidates.push(this.sanitize(val));
+                }
+            }
+        };
+
+        // 1. Load Manual Key if set
+        if (this.manualKey) candidates.push(this.manualKey);
+
+        // 2. Load standard env vars
+        add(process.env.API_KEY);
+        add(env.VITE_API_KEY);
+        add(env.VITE_API_KEYS);
+        add(env.API_KEYS);
+
+        // 3. Load Indexed Keys (VITE_API_KEY_1 to 20)
+        for (let i = 1; i <= 20; i++) {
+            add(env[`VITE_API_KEY_${i}`]);
+            add(process.env[`API_KEY_${i}`]);
         }
 
-        // Check for indexed keys (VITE_API_KEY_1, VITE_API_KEY_2...)
-        for (let i = 1; i <= 10; i++) {
-            const k = env[`VITE_API_KEY_${i}`];
-            if (k) this.keys.push(this.sanitize(k as string));
-        }
-
-        // Deduplicate
-        this.keys = [...new Set(this.keys)].filter(k => k && k.length > 10);
-        console.log(`[GeminiService] Loaded ${this.keys.length} API Keys.`);
+        // Deduplicate and filter empty
+        this.keys = [...new Set(candidates)].filter(k => k && k.length > 20);
+        console.log(`[GeminiService] Loaded ${this.keys.length} Unique API Keys.`);
     }
 
     private sanitize(key: string | undefined): string {
@@ -55,8 +72,9 @@ class KeyManager {
 
     public setManualKey(key: string) {
         this.manualKey = this.sanitize(key);
-        // Add to front of queue
-        this.keys.unshift(this.manualKey);
+        // Reload to prioritize manual key
+        this.keys = [];
+        this.loadKeys();
         this.currentIndex = 0;
     }
 
@@ -95,6 +113,9 @@ const SAFETY_SETTINGS: any[] = [
 
 // Generic wrapper for all AI calls to handle failover
 async function callWithRetry<T>(fn: (ai: GoogleGenAI) => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+  // Enforce Rate Limit before making a call
+  await enforceRateLimit();
+
   try {
     const apiKey = keyManager.getCurrentKey();
     const ai = new GoogleGenAI({ apiKey });
@@ -107,17 +128,24 @@ async function callWithRetry<T>(fn: (ai: GoogleGenAI) => Promise<T>, retries = 3
     
     const isAuthError = error.status === 400 || (error.message && error.message.includes('API key not valid'));
 
-    // If Quota or Auth error, Rotate key and retry immediately
+    // Handle Quota/Auth Errors
     if (isQuotaError || isAuthError) {
         if (keyManager.getActiveKeyCount() > 1) {
             console.warn("API Key Exhausted or Invalid. Rotating...");
             keyManager.rotateKey();
-            // Retry with new key (decrement retries to avoid infinite loops if all keys are bad)
-            if (retries > 0) {
-                return callWithRetry(fn, retries - 1, 500); 
-            }
+            // Retry immediately with next key
+            if (retries > 0) return callWithRetry(fn, retries - 1, 500);
         } else {
-             throw new Error("429 Resource Exhausted: Your API Key quota is full and no backup keys are available.");
+             // SINGLE KEY FALLBACK STRATEGY
+             // If we only have 1 key, it might just be a momentary RPM limit. Wait 5s and try again.
+             if (isQuotaError && retries > 0) {
+                 console.warn(`[GeminiService] 429 Quota Hit (Single Key). Waiting 5s before retry... (${retries} left)`);
+                 await new Promise(r => setTimeout(r, 5000));
+                 return callWithRetry(fn, retries - 1, 5000);
+             }
+             
+             // If retries exhausted, throw specific error to trigger UI Modal
+             throw new Error("API_KEY_EXHAUSTED: Your API Key quota is full (429). Please enter a new key.");
         }
     }
 
@@ -331,30 +359,29 @@ export const generateUKResume = async (
 ): Promise<UKResumeData> => {
   return callWithRetry(async (ai) => {
     let parts: any[] = [
-      { text: `You are a Senior UK Recruitment Consultant & Expert Ghostwriter. Convert the input resume into a HIGHLY OPTIMIZED UK-STYLE CV.
+      { text: `You are a Senior UK Recruitment Consultant & Expert Ghostwriter. Convert the input resume into a HIGHLY DENSE, CONTENT-RICH UK-STYLE CV.
 
-      CRITICAL: HUMANIZATION & AI DETECTION AVOIDANCE
-      - Do not use typical AI buzzwords like "spearheaded", "fostering", "unwavering", "delved", or "tapestry".
-      - Use **Burstiness**: Vary sentence structure and length. Mix short, punchy statements with detailed technical explanations.
-      - Write in a natural, professional British tone (e.g., "Led the project" instead of "Orchestrated the implementation").
-      - Use concrete metrics over flowery adjectives.
+      OBJECTIVE: Create a resume that physically fills ${pages} A4 Page(s) with high-value content. Minimize vertical whitespace usage in text.
 
-      STRICT RULES:
-      1. LENGTH: Fit strictly into ${pages} Page(s).
-      2. FORMAT: British English (e.g., 'Analysed', 'Organised').
-      3. HEADER: Name, Location, Phone, Email, LinkedIn${portfolioUrl ? `, Portfolio: ${portfolioUrl}` : ''}.
-      4. SECTIONS:
-         - Professional Profile: 3-4 lines, human tone.
-         - Core Competencies: 9-12 hard skills.
-         - Experience: Reverse chronological. Bullet points must be action-oriented results.
-         - Education.
-         - Interests (Brief).
+      CRITICAL RULES FOR CONTENT DENSITY:
+      1. **EXPAND WITH PRECISION.** If the input says "Worked on API", you must extrapolate: "Architected and deployed high-performance RESTful APIs using Node.js, increasing data throughput by 40% and reducing latency."
+      2. **PROFESSIONAL PROFILE (The Narrative):** A captivating 4-5 line narrative pitch. Focus on career trajectory, leadership, and soft skills. Keep it dense.
+      3. **EXPERIENCE BULLETS:**
+         - **STRICT LIMIT: 4-6 bullet points per role.** Do not exceed 6.
+         - Use the **STAR Method** (Situation, Task, Action, Result) for EVERY bullet.
+         - Ensure bullets are dense and full-width but not multi-paragraph.
+      4. **CORE COMPETENCIES:** List 12-16 hard and soft skills.
+      5. **INTERESTS:** Concise but descriptive sentences (1-2 lines max).
+
+      FORMATTING:
+      - British English (e.g., 'Analysed', 'Organised').
+      - HEADER: Name, Location, Phone, Email, LinkedIn${portfolioUrl ? `, Portfolio: ${portfolioUrl}` : ''}.
 
       OUTPUT: JSON format.` }
     ];
 
     if (typeof resumeInput === 'string') {
-      parts.push({ text: `Resume Data: ${resumeInput.slice(0, 20000)}` });
+      parts.push({ text: `Resume Data: ${resumeInput.slice(0, 30000)}` });
     } else {
       parts.push({ inlineData: { data: resumeInput.data, mimeType: resumeInput.mimeType } });
     }
@@ -363,7 +390,7 @@ export const generateUKResume = async (
       model: "gemini-3-pro-preview",
       contents: { parts },
       config: {
-        temperature: 0.65,
+        temperature: 0.6, // Reduced slightly to adhere more strictly to length constraints
         responseMimeType: "application/json",
         safetySettings: SAFETY_SETTINGS,
         responseSchema: {
@@ -371,7 +398,7 @@ export const generateUKResume = async (
           properties: {
             fullName: { type: Type.STRING },
             contactInfo: { type: Type.STRING },
-            professionalProfile: { type: Type.STRING },
+            professionalProfile: { type: Type.STRING, description: "4-5 lines max, dense narrative." },
             coreCompetencies: { type: Type.ARRAY, items: { type: Type.STRING } },
             experience: {
               type: Type.ARRAY,
@@ -382,7 +409,7 @@ export const generateUKResume = async (
                   company: { type: Type.STRING },
                   location: { type: Type.STRING },
                   dates: { type: Type.STRING },
-                  responsibilities: { type: Type.ARRAY, items: { type: Type.STRING } }
+                  responsibilities: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Max 6 detailed STAR method bullets per role." }
                 },
                 required: ["role", "company", "dates", "responsibilities"]
               }
@@ -395,12 +422,12 @@ export const generateUKResume = async (
                   degree: { type: Type.STRING },
                   institution: { type: Type.STRING },
                   dates: { type: Type.STRING },
-                  details: { type: Type.STRING }
+                  details: { type: Type.STRING, description: "Relevant modules, dissertation title, or key achievements." }
                 },
                 required: ["degree", "institution", "dates"]
               }
             },
-            interests: { type: Type.STRING },
+            interests: { type: Type.STRING, description: "Concise sentences." },
             references: { type: Type.STRING }
           },
           required: ["fullName", "contactInfo", "professionalProfile", "coreCompetencies", "experience", "education", "references"]
@@ -540,31 +567,30 @@ export const transformAcademicToBlog = async (
 export const generateViralPosts = async (
     sourceInput: string | { data: string; mimeType: string } | null,
     topics: string,
-    contextDate: string
+    contextDate: string,
+    preferences: { length: string, style: string }
 ): Promise<ViralPost[]> => {
     return callWithRetry(async (ai) => {
         let parts: any[] = [
             { text: `ACT AS AGENT 6: THE VIRAL LINKEDIN GHOSTWRITER.
             
-            GOAL: Create 4 HIGH-ENGAGEMENT, LONG-FORM LinkedIn Posts.
+            GOAL: Create 4 HIGH-ENGAGEMENT, LinkedIn Posts.
             CONTEXT DATE: ${contextDate}
             TOPICS: ${topics || 'General Tech Trends'}
             
+            USER PREFERENCES:
+            - Length: ${preferences.length}
+            - Style/Tone: ${preferences.style}
+            
             INSTRUCTIONS:
-            1. CONTENT DEPTH: Each post must be DETAILED and STORY-DRIVEN (approx 200-300 words). Do not write short snippets.
-            2. FORMATTING: Use generous spacing (line breaks) for readability. Use bullet points where appropriate.
-            3. STRUCTURE:
+            1. CONTENT DEPTH: Create posts matching the requested length ('Short' ~100-150 words, 'Medium' ~200-300 words, 'Long' ~500+ words).
+            2. TONE: Adhere strictly to the '${preferences.style}' tone (e.g. if 'Controversial', use bold pattern interrupts. If 'Storytelling', use the Hero's Journey).
+            3. FORMATTING: Use generous spacing (double line breaks) for readability. Use bullet points where appropriate.
+            4. STRUCTURE:
                - THE HOOK: A scroll-stopping first line.
-               - THE STORY/INSIGHT: Deep dive into the "How", "Why", or "What happened".
-               - THE TAKEAWAY: Actionable advice for the reader.
+               - THE BODY: The main value proposition.
                - THE CALL TO ACTION: A question to drive comments.
             
-            STYLES:
-            1. Storytelling (The "Hero's Journey"): Personal struggle -> pivot -> success.
-            2. Achievement/Insight (The "Value Bomb"): Dense, actionable advice or a "How I did X" breakdown.
-            3. Contrarian (The "Pattern Interrupt"): "Unpopular opinion: X is dead."
-            4. Trend/News (The "Newsjacker"): Relevant to current events in the field.
-
             OUTPUT: JSON Array of 4 objects.
             `}
         ];
@@ -588,9 +614,9 @@ export const generateViralPosts = async (
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            style: { type: Type.STRING, enum: ['Storytelling', 'Achievement', 'Insight', 'Contrarian', 'Trend'] },
+                            style: { type: Type.STRING },
                             hook: { type: Type.STRING },
-                            body: { type: Type.STRING, description: "Long-form content, roughly 200 words." },
+                            body: { type: Type.STRING },
                             hashtags: { type: Type.STRING },
                             estimatedViralityScore: { type: Type.NUMBER }
                         },

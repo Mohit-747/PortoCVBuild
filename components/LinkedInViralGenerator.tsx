@@ -15,6 +15,11 @@ export const LinkedInViralGenerator: React.FC<Props> = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [topics, setTopics] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // New State for Preferences
+  const [length, setLength] = useState<'Short' | 'Medium' | 'Long'>('Medium');
+  const [style, setStyle] = useState<string>('Professional');
+  
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,7 +58,7 @@ export const LinkedInViralGenerator: React.FC<Props> = ({ onBack }) => {
           }
       }
 
-      const results = await generateViralPosts(rawData, topics, date);
+      const results = await generateViralPosts(rawData, topics, date, { length, style });
       setPosts(results);
     } catch (err: any) {
       alert("Generation failed: " + err.message);
@@ -142,6 +147,45 @@ export const LinkedInViralGenerator: React.FC<Props> = ({ onBack }) => {
                              />
                          </div>
 
+                         {/* OPTIONS GRID */}
+                         <div className="grid md:grid-cols-2 gap-6">
+                             {/* LENGTH SELECTOR */}
+                             <div className="space-y-2">
+                                 <label className="text-xs font-bold uppercase tracking-widest text-blue-400 block">
+                                    <i className="fas fa-ruler-vertical mr-2"></i> Length
+                                 </label>
+                                 <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10">
+                                     {['Short', 'Medium', 'Long'].map((opt) => (
+                                         <button 
+                                            key={opt}
+                                            onClick={() => setLength(opt as any)}
+                                            className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase transition-all ${length === opt ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                                         >
+                                             {opt}
+                                         </button>
+                                     ))}
+                                 </div>
+                             </div>
+
+                             {/* STYLE SELECTOR */}
+                             <div className="space-y-2">
+                                 <label className="text-xs font-bold uppercase tracking-widest text-blue-400 block">
+                                    <i className="fas fa-paint-brush mr-2"></i> Tone & Style
+                                 </label>
+                                 <select 
+                                    value={style}
+                                    onChange={(e) => setStyle(e.target.value)}
+                                    className="w-full bg-slate-900/50 border border-white/10 rounded-xl p-2.5 text-white text-xs outline-none focus:border-blue-500 transition-all font-bold uppercase"
+                                 >
+                                     <option value="Professional">Professional (Safe)</option>
+                                     <option value="Storytelling">Storytelling (Hero's Journey)</option>
+                                     <option value="Contrarian">Contrarian (Hot Take)</option>
+                                     <option value="Creative">Creative / Poetic</option>
+                                     <option value="Educational">Educational / How-To</option>
+                                 </select>
+                             </div>
+                         </div>
+
                          <div className="grid md:grid-cols-2 gap-6">
                              {/* DATE INPUT */}
                              <div className="space-y-2">
@@ -195,8 +239,8 @@ export const LinkedInViralGenerator: React.FC<Props> = ({ onBack }) => {
                         className="glass p-6 rounded-[30px] border border-white/10 flex flex-col h-full hover:border-blue-500/50 transition-all group"
                      >
                          <div className="flex justify-between items-start mb-4">
-                             <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-lg text-[10px] font-bold uppercase tracking-wider">{post.style}</span>
-                             <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                             <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-lg text-[10px] font-bold uppercase tracking-wider truncate max-w-[100px]">{post.style}</span>
+                             <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1 flex-shrink-0">
                                  <i className="fas fa-fire text-orange-500"></i> {post.estimatedViralityScore}/100
                              </span>
                          </div>
@@ -204,7 +248,7 @@ export const LinkedInViralGenerator: React.FC<Props> = ({ onBack }) => {
                          <h3 className="text-sm font-bold text-white mb-4 italic">"{post.hook}"</h3>
                          
                          <div className="flex-1 bg-white/5 p-4 rounded-xl mb-6 overflow-y-auto max-h-[300px] scrollbar-thin">
-                             <div className="text-xs text-slate-300 leading-relaxed font-sans">
+                             <div className="text-xs text-slate-300 leading-relaxed font-sans whitespace-pre-wrap">
                                 {post.body.split(/\\n|\n/).map((line, i) => (
                                     <React.Fragment key={i}>
                                         {line}

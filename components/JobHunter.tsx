@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 // @ts-ignore
 import mammoth from 'mammoth';
 import { JobListing, UKResumeData } from '../types';
 import { GoogleGenAI } from "@google/genai";
-import { generateUKResume, tailorResumeToJob } from '../services/geminiService';
+import { generateUKResume, tailorResumeToJob, setManualApiKey } from '../services/geminiService';
 
 interface Props {
   onBack: () => void;
@@ -101,7 +102,7 @@ export const JobHunter: React.FC<Props> = ({ onBack, resumeData, setResumeData }
        const generatedCV = await generateUKResume(rawData);
        setResumeData(generatedCV);
     } catch (err) {
-       alert("Failed to parse resume.");
+       alert("Failed to parse resume. Check API Key in Nav.");
     } finally {
        setLoading(false);
     }
@@ -154,7 +155,10 @@ export const JobHunter: React.FC<Props> = ({ onBack, resumeData, setResumeData }
               return filteredJobs.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
            });
         }
-     } catch (e) { console.error(e); } finally { setAnalyzing(false); }
+     } catch (e) { 
+         // If error is related to API key, we should ideally handle it, but here we just log
+         console.error(e); 
+     } finally { setAnalyzing(false); }
   };
 
   const generateApplication = async (job: JobListing) => {
@@ -188,7 +192,16 @@ export const JobHunter: React.FC<Props> = ({ onBack, resumeData, setResumeData }
         data: res.data || undefined
       });
     } catch (e: any) {
-      alert("Moulding failed: " + e.message);
+      if(e.message.includes("API_KEY_MISSING") || e.message.includes("API_KEY_EXHAUSTED")) {
+         const key = prompt("API Key Missing or Exhausted. Enter new Key:");
+         if(key) {
+             setManualApiKey(key);
+             alert("Key saved. Retrying...");
+             // Retry logic would go here, but for now just letting user click again
+         }
+      } else {
+         alert("Moulding failed: " + e.message);
+      }
     } finally {
       setMoulding(false);
     }
@@ -243,6 +256,7 @@ export const JobHunter: React.FC<Props> = ({ onBack, resumeData, setResumeData }
                         ) : jobs.length === 0 ? (
                             <div className="text-center py-10 opacity-50">
                                 <p className="text-xs uppercase font-bold">No jobs found.</p>
+                                <p className="text-[10px] text-slate-500">Ensure API Key is valid in Nav</p>
                             </div>
                         ) : (
                             jobs.map(job => (

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { setManualApiKey } from '../services/geminiService';
 
 interface Props {
   onLogin: (email: string) => void;
@@ -13,6 +14,7 @@ const ADMIN_EMAIL = "mohit.bvcoe747@gmail.com";
 export const LoginGate: React.FC<Props> = ({ onLogin, onBack }) => {
   const [email, setEmail] = useState('');
   const [otpInput, setOtpInput] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -83,6 +85,11 @@ export const LoginGate: React.FC<Props> = ({ onLogin, onBack }) => {
         return;
     }
 
+    // Set API Key if provided
+    if (apiKey.trim().length > 10) {
+       setManualApiKey(apiKey.trim());
+    }
+
     setTimeout(() => {
       // 1. Email Validation
       if (!email.includes('@') || email.length < 5) {
@@ -114,7 +121,7 @@ export const LoginGate: React.FC<Props> = ({ onLogin, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#020617]">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#020617] text-white">
       {/* Background FX */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
          <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/20 blur-[150px] rounded-full animate-pulse"></div>
@@ -122,21 +129,21 @@ export const LoginGate: React.FC<Props> = ({ onLogin, onBack }) => {
       </div>
 
       <div className="absolute top-6 left-6 z-20">
-          <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors uppercase font-bold text-xs tracking-widest">
+          <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors uppercase font-bold text-xs tracking-widest cursor-pointer z-50">
               <i className="fas fa-arrow-left"></i> Back to Home
           </button>
       </div>
 
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 1, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8 }}
+        transition={{ duration: 0.5 }}
         className="z-10 w-full max-w-md p-6"
       >
-        <div className="glass p-10 rounded-[40px] border-t border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center relative overflow-hidden">
+        <div className="glass p-10 rounded-[40px] border-t border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center relative overflow-hidden bg-slate-900/80 backdrop-blur-xl">
            
            {/* Header */}
-           <div className="mb-8 relative">
+           <div className="mb-6 relative">
              <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl mx-auto flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.6)] mb-4">
                 <i className="fas fa-fingerprint text-3xl text-white"></i>
              </div>
@@ -147,11 +154,52 @@ export const LoginGate: React.FC<Props> = ({ onLogin, onBack }) => {
            </div>
 
            {/* Form */}
-           <form onSubmit={handleLogin} className="space-y-5">
+           <form onSubmit={handleLogin} className="space-y-6">
               
+              {/* STUDIO CONFIGURATION (API KEY) */}
+              <div className="bg-indigo-500/10 border border-indigo-500/20 p-5 rounded-2xl text-left space-y-3 relative overflow-hidden">
+                 <div className="flex items-center gap-2 mb-1">
+                     <i className="fas fa-cogs text-indigo-400"></i>
+                     <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Studio Configuration</span>
+                 </div>
+                 
+                 <div className="bg-slate-900/50 p-3 rounded-xl border border-white/5 space-y-2">
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                        <span className="font-bold text-white">Why do I need a key?</span> <br/>
+                        This tool uses <b>Google Gemini Pro</b>. Using your own free key ensures:
+                    </p>
+                    <ul className="text-[9px] text-slate-400 list-disc list-inside space-y-1 ml-1">
+                        <li>Zero wait times (dedicated quota)</li>
+                        <li>Full Privacy (your data stays with you)</li>
+                        <li>No usage limits from shared pool</li>
+                    </ul>
+                 </div>
+
+                 <div className="space-y-2">
+                     <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">How to get one (Free):</p>
+                     <ol className="text-[9px] text-slate-400 list-decimal list-inside space-y-1">
+                        <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-indigo-400 hover:underline">Google AI Studio</a></li>
+                        <li>Click <b>Get API key</b></li>
+                        <li>Click <b>Create API key</b></li>
+                        <li>Copy the key starting with <code>AIzaSy...</code></li>
+                     </ol>
+                 </div>
+
+                 <div className="relative mt-2">
+                    <i className="fas fa-key absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+                    <input 
+                      type="password" 
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="Paste Gemini API Key (Starts with AIzaSy...)"
+                      className="w-full bg-slate-900/80 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-white text-xs placeholder-slate-600 focus:border-indigo-500 outline-none transition-all font-mono"
+                    />
+                 </div>
+              </div>
+
               {/* Email Input */}
               <div className="text-left space-y-2">
-                 <label className="text-[9px] font-bold uppercase tracking-widest text-indigo-400 ml-4">Identity</label>
+                 <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 ml-4">Identity</label>
                  <div className="relative">
                     <i className="fas fa-envelope absolute left-5 top-1/2 -translate-y-1/2 text-slate-500"></i>
                     <input 
@@ -203,7 +251,7 @@ export const LoginGate: React.FC<Props> = ({ onLogin, onBack }) => {
 
               {/* OTP Input */}
               <div className="text-left space-y-2">
-                 <label className="text-[9px] font-bold uppercase tracking-widest text-indigo-400 ml-4">Enter Response OTP</label>
+                 <label className="text-[9px] font-bold uppercase tracking-widest text-slate-500 ml-4">Enter Response OTP</label>
                  <div className="relative">
                     <i className="fas fa-key absolute left-5 top-1/2 -translate-y-1/2 text-slate-500"></i>
                     <input 
@@ -237,7 +285,7 @@ export const LoginGate: React.FC<Props> = ({ onLogin, onBack }) => {
                        <i className="fas fa-circle-notch fa-spin"></i> Validating...
                     </span>
                  ) : (
-                    <span>Authenticate</span>
+                    <span>Authenticate & Enter</span>
                  )}
               </button>
            </form>

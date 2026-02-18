@@ -122,7 +122,7 @@ export interface AcademicTranslation {
 }
 
 export interface ViralPost {
-    style: 'Storytelling' | 'Achievement' | 'Insight' | 'Contrarian';
+    style: string;
     hook: string;
     body: string;
     hashtags: string;

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 // @ts-ignore
 import mammoth from 'mammoth';
 import { UKResumeData } from '../types';
-import { generateUKResume } from '../services/geminiService';
+import { generateUKResume, setManualApiKey } from '../services/geminiService';
 
 interface Props {
   onBack: () => void;
@@ -18,6 +18,9 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
   const [portfolioLink, setPortfolioLink] = useState('');
   const [targetPages, setTargetPages] = useState<1 | 2>(1);
   const [isEditing, setIsEditing] = useState(false);
+  
+  // API Key Fallback Local State
+  const [manualKey, setManualKey] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resumeRef = useRef<HTMLDivElement>(null);
@@ -55,6 +58,14 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveKey = () => {
+     if(manualKey.trim().length > 10) {
+         setManualApiKey(manualKey);
+         setError('');
+         alert("Key saved! Try uploading again.");
+     }
   };
 
   const handleDownloadPDF = () => {
@@ -205,11 +216,29 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
              </div>
           </div>
 
-          {error && <p className="text-red-400 font-bold bg-red-500/10 p-4 rounded-xl border border-red-500/20">{error}</p>}
+          {error && (
+              <div className="text-red-400 font-bold bg-red-500/10 p-6 rounded-xl border border-red-500/20 max-w-lg mx-auto">
+                  <p className="mb-2"><i className="fas fa-exclamation-circle mr-2"></i> {error}</p>
+                  {(error.includes("API_KEY_MISSING") || error.includes("API_KEY_EXHAUSTED")) && (
+                      <div className="mt-4 flex gap-2">
+                          <input 
+                             type="password" 
+                             className="flex-1 bg-slate-900 border border-red-500/30 rounded-lg px-3 py-2 text-sm text-white focus:border-red-500 outline-none"
+                             placeholder="Enter Gemini API Key..."
+                             value={manualKey}
+                             onChange={e => setManualKey(e.target.value)}
+                          />
+                          <button onClick={handleSaveKey} className="px-4 py-2 bg-red-500 text-white rounded-lg text-xs font-bold uppercase">Save</button>
+                      </div>
+                  )}
+              </div>
+          )}
         </motion.div>
       </div>
     );
   }
+
+  // ... (rest of the component remains unchanged - loading and resume preview states) ...
 
   if (loading) {
     return (
@@ -259,11 +288,11 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
 
        {/* CV PREVIEW - COMPACT A4 SIZE */}
        <div className="flex justify-center pb-20">
-         <div ref={resumeRef} className="bg-white text-slate-900 w-[210mm] min-h-[297mm] p-[15mm] shadow-[0_0_50px_rgba(0,0,0,0.5)] mx-auto relative" style={{ fontFamily: 'Calibri, Arial, sans-serif' }}>
+         <div ref={resumeRef} className="bg-white text-slate-900 w-[210mm] min-h-[297mm] p-[10mm] shadow-[0_0_50px_rgba(0,0,0,0.5)] mx-auto relative" style={{ fontFamily: 'Calibri, Arial, sans-serif' }}>
             {data && (
                 <>
                     {/* Header */}
-                    <header className="text-center mb-4 border-b-2 border-slate-900 pb-2">
+                    <header className="text-center mb-3 border-b-2 border-slate-900 pb-2">
                         <div className="mb-1">
                           <EditableText 
                              value={data.fullName} 
@@ -280,9 +309,9 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                         </div>
                     </header>
 
-                    {/* Profile */}
-                    <section className="mb-3">
-                        <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-1.5 text-slate-800 tracking-wider">Professional Profile</h2>
+                    {/* Profile - NARRATIVE Focus */}
+                    <section className="mb-4">
+                        <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-1 text-slate-800 tracking-wider">Professional Profile</h2>
                         <EditableText 
                            value={data.professionalProfile} 
                            onChange={(v) => setData({...data, professionalProfile: v})} 
@@ -292,9 +321,9 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                     </section>
 
                     {/* Competencies */}
-                    <section className="mb-3">
-                        <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-1.5 text-slate-800 tracking-wider">Core Competencies</h2>
-                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <section className="mb-4">
+                        <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-1 text-slate-800 tracking-wider">Core Competencies</h2>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
                             {data.coreCompetencies?.map((skill, i) => (
                                 <span key={i} className="text-xs font-semibold text-slate-700 flex items-center gap-1">
                                   • <EditableText 
@@ -311,9 +340,9 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                     </section>
 
                     {/* Experience */}
-                    <section className="mb-3">
+                    <section className="mb-4">
                         <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-2 text-slate-800 tracking-wider">Professional Experience</h2>
-                        <div className="space-y-2.5">
+                        <div className="space-y-3">
                             {data.experience?.map((exp, i) => (
                                 <div key={i}>
                                     <div className="flex justify-between items-baseline mb-0.5">
@@ -324,7 +353,7 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                                             newExp[i].role = v;
                                             setData({...data, experience: newExp});
                                           }}
-                                          className="font-bold text-sm text-slate-950"
+                                          className="font-bold text-base text-slate-950"
                                         />
                                         <EditableText 
                                           value={exp.dates} 
@@ -333,7 +362,7 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                                             newExp[i].dates = v;
                                             setData({...data, experience: newExp});
                                           }}
-                                          className="text-xs font-bold text-slate-600 whitespace-nowrap text-right"
+                                          className="text-sm font-bold text-slate-600 whitespace-nowrap text-right"
                                         />
                                     </div>
                                     <div className="flex justify-between items-center mb-1">
@@ -344,7 +373,7 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                                             newExp[i].company = v;
                                             setData({...data, experience: newExp});
                                           }}
-                                          className="text-xs font-bold text-slate-700 italic uppercase"
+                                          className="text-sm font-bold text-slate-700 italic uppercase"
                                         />
                                         <EditableText 
                                           value={exp.location} 
@@ -377,7 +406,7 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                     </section>
 
                     {/* Education */}
-                    <section className="mb-3">
+                    <section className="mb-4">
                         <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-2 text-slate-800 tracking-wider">Education</h2>
                         <div className="space-y-2">
                             {data.education?.map((edu, i) => (
@@ -420,7 +449,7 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                                             setData({...data, education: newEdu});
                                         }}
                                         multiline
-                                        className="text-xs text-slate-600 mt-0.5 text-justify block"
+                                        className="text-xs text-slate-600 mt-0.5 text-justify block leading-tight"
                                       />
                                     )}
                                 </div>
@@ -429,24 +458,24 @@ export const UKResumeBuilder: React.FC<Props> = ({ onBack, onFindJobs }) => {
                     </section>
 
                     {/* Interests & References */}
-                    <div className="grid grid-cols-2 gap-6 mt-auto">
+                    <div className="grid grid-cols-1 gap-4 mt-auto">
                          {data.interests !== undefined && (
                            <section>
-                              <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-1.5 text-slate-800 tracking-wider">Interests</h2>
+                              <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-1 text-slate-800 tracking-wider">Interests & Activities</h2>
                               <EditableText 
                                  value={data.interests} 
                                  onChange={(v) => setData({...data, interests: v})} 
                                  multiline
-                                 className="text-xs text-slate-700 leading-snug text-justify block"
+                                 className="text-sm text-slate-700 leading-snug text-justify block"
                               />
                            </section>
                          )}
                          <section>
-                            <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-1.5 text-slate-800 tracking-wider">References</h2>
+                            <h2 className="text-base font-bold uppercase border-b border-slate-300 mb-1 text-slate-800 tracking-wider">References</h2>
                             <EditableText 
                                value={data.references} 
                                onChange={(v) => setData({...data, references: v})} 
-                               className="text-xs text-slate-700 block"
+                               className="text-sm text-slate-700 block"
                             />
                          </section>
                     </div>

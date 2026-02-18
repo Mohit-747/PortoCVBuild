@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 // @ts-ignore
@@ -17,7 +18,6 @@ import { GlobalNav } from './components/GlobalNav';
 import { LandingPage } from './components/LandingPage';
 
 const STORAGE_KEY = 'studex_history_v1';
-const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 Minutes
 
 const CreatorBadge = () => (
   <motion.div 
@@ -45,6 +45,7 @@ const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>(AppMode.LANDING);
   const [currentUser, setCurrentUser] = useState<string>('');
   
+  // App Logic State
   const [step, setStep] = useState<AppStep>(AppStep.INPUT);
   const [resumeData, setResumeData] = useState<string | { data: string; mimeType: string } | null>(null);
   const [fileName, setFileName] = useState<string>('');
@@ -64,8 +65,8 @@ const App: React.FC = () => {
   const [editPrompt, setEditPrompt] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   
-  // API Key Manual Fallback
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  // API Key Handling
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false); // For ongoing/emergency fallback
   const [manualKeyInput, setManualKeyInput] = useState('');
 
   // User Preferences
@@ -90,20 +91,6 @@ const App: React.FC = () => {
       console.warn("Failed to load history", e);
     }
   }, []);
-
-  // SESSION TIMEOUT LOGIC
-  useEffect(() => {
-    let timer: any;
-    if (mode !== AppMode.LOGIN && mode !== AppMode.LANDING) {
-      // Start 10 minute timer when not in login/landing screen
-      timer = setTimeout(() => {
-        setMode(AppMode.LOGIN);
-        setCurrentUser('');
-        alert("Session Expired: You have been logged out after 10 minutes to preserve server resources.");
-      }, SESSION_DURATION_MS);
-    }
-    return () => clearTimeout(timer);
-  }, [mode]);
 
   const handleLogin = (email: string) => {
     setCurrentUser(email);
@@ -187,8 +174,8 @@ const App: React.FC = () => {
     } catch (error: any) {
       console.error(error);
       
-      // Handle Missing API Key specifically to allow manual input
-      if (error.message.includes("API_KEY_MISSING") || error.message.includes("Invalid API Key")) {
+      // Handle Missing or Exhausted Key
+      if (error.message.includes("API_KEY_MISSING") || error.message.includes("API_KEY_EXHAUSTED") || error.message.includes("Invalid API Key")) {
           setStep(AppStep.INPUT);
           setShowApiKeyModal(true);
       } else {
@@ -202,7 +189,7 @@ const App: React.FC = () => {
       if (manualKeyInput.trim().length > 10) {
           setManualApiKey(manualKeyInput);
           setShowApiKeyModal(false);
-          alert("Key updated! Please try generating again.");
+          alert("Key updated! Please continue.");
       } else {
           alert("Invalid API Key format.");
       }
@@ -217,7 +204,7 @@ const App: React.FC = () => {
       setPortfolio(updatedData);
       setEditPrompt('');
     } catch (e: any) {
-      if (e.message.includes("API_KEY_MISSING") || e.message.includes("Invalid API Key")) {
+      if (e.message.includes("API_KEY_MISSING") || e.message.includes("API_KEY_EXHAUSTED") || e.message.includes("Invalid API Key")) {
          setShowApiKeyModal(true);
       } else {
          alert(`Edit failed: ${e.message}`);
@@ -251,7 +238,9 @@ const App: React.FC = () => {
 
   // --- LANDING VIEW ---
   if (mode === AppMode.LANDING) {
-      return <LandingPage onStart={() => setMode(AppMode.LOGIN)} />;
+      return (
+        <LandingPage onStart={() => setMode(AppMode.LOGIN)} />
+      );
   }
 
   // --- LOGIN VIEW ---
@@ -262,7 +251,12 @@ const App: React.FC = () => {
   // --- WRAPPER FOR LOGGED IN VIEWS ---
   return (
     <>
-      <GlobalNav currentMode={mode} setMode={setMode} currentUser={currentUser} />
+      <GlobalNav 
+          currentMode={mode} 
+          setMode={setMode} 
+          currentUser={currentUser} 
+          onOpenKeyModal={() => setShowApiKeyModal(true)}
+      />
       
       {/* HOME VIEW */}
       {mode === AppMode.HOME && (
@@ -401,8 +395,8 @@ const App: React.FC = () => {
                   <div className="glass p-8 rounded-3xl max-w-md w-full border-red-500/30 shadow-[0_0_50px_rgba(239,68,68,0.2)]">
                       <div className="text-center mb-6">
                           <i className="fas fa-key text-3xl text-red-400 mb-4"></i>
-                          <h3 className="text-xl font-bold text-white mb-2">API Key Required</h3>
-                          <p className="text-xs text-slate-400">The build-time API Key is missing or invalid. Please enter your Google Gemini API Key manually to continue.</p>
+                          <h3 className="text-xl font-bold text-white mb-2">API Key Management</h3>
+                          <p className="text-xs text-slate-400">If your quota is exhausted or you are deploying on Vercel without env vars, enter your Google Gemini API key here.</p>
                       </div>
                       <input 
                         type="password" 
@@ -633,72 +627,6 @@ const App: React.FC = () => {
                     </div>
 
                   </div>
-                </motion.div>
-              )}
-
-              {step === AppStep.GENERATING && (
-                <motion.div key="generating" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="min-h-screen flex flex-col items-center justify-center text-center px-6 z-50 relative">
-                    <div className="relative w-40 h-40 mb-12">
-                        <div className="absolute inset-0 border-t-4 border-indigo-500 rounded-full animate-spin"></div>
-                        <div className="absolute inset-4 border-r-4 border-purple-500 rounded-full animate-spin-slow"></div>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <i className="fas fa-cube text-5xl text-white/20 animate-pulse"></i>
-                        </div>
-                    </div>
-                    <h2 className="text-4xl md:text-6xl font-black uppercase italic tracking-tighter text-white mb-6">
-                        {loadingMsg || "Constructing..."}
-                    </h2>
-                    <p className="text-indigo-400 text-sm font-bold uppercase tracking-[0.5em] animate-pulse">
-                        {motivationalQuote || "Agent 1 is working..."}
-                    </p>
-                </motion.div>
-              )}
-
-              {step === AppStep.PREVIEW && portfolio && (
-                <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pb-32 relative">
-                  
-                  {/* EDITOR OVERLAY */}
-                  <div className="fixed bottom-10 right-10 z-[300] flex flex-col gap-4 items-end">
-                      <AnimatePresence>
-                        {isEditing && (
-                            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="glass p-6 rounded-[30px] border border-indigo-500/30 w-96 shadow-2xl mb-2 backdrop-blur-xl bg-black/60">
-                              <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                  <i className="fas fa-robot text-indigo-400"></i>
-                                  <span className="text-xs font-bold uppercase text-indigo-400 tracking-widest">AI Agent Editor</span>
-                                </div>
-                                <button onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-white"><i className="fas fa-times"></i></button>
-                              </div>
-                              <textarea 
-                                className="w-full bg-slate-900/50 rounded-2xl p-4 text-xs text-white border border-white/10 outline-none focus:border-indigo-500 mb-4 h-32 resize-none leading-relaxed"
-                                placeholder="E.g. Make the summary funnier, change the accent color to gold, or emphasize my React skills..."
-                                value={editPrompt}
-                                onChange={(e) => setEditPrompt(e.target.value)}
-                              />
-                              <button 
-                                onClick={handleEditPortfolio} 
-                                className="w-full py-3 bg-indigo-600 rounded-xl text-xs font-bold uppercase hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/20"
-                              >
-                                Run Changes
-                              </button>
-                            </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <div className="glass p-2 rounded-2xl flex gap-2 shadow-2xl border-white/10 items-center bg-black/40 backdrop-blur-md">
-                        <button onClick={() => setIsEditing(!isEditing)} className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all shadow-lg ${isEditing ? 'bg-indigo-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-indigo-400'}`} title="Edit with AI">
-                          <i className="fas fa-magic text-xl"></i>
-                        </button>
-                        <div className="h-8 w-[1px] bg-white/10 mx-2"></div>
-                        <button onClick={() => setStep(AppStep.INPUT)} className="px-6 py-4 bg-slate-800/80 hover:bg-slate-700 rounded-xl font-bold text-xs uppercase transition-all text-white">Back</button>
-                        <button onClick={() => setStep(AppStep.DEPLOY_CONFIG)} className="px-8 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-xs uppercase shadow-lg transition-all flex items-center gap-2 text-white">
-                          <span>Deploy</span>
-                          <i className="fab fa-github"></i>
-                        </button>
-                      </div>
-                  </div>
-                  
-                  <PortfolioViewer data={portfolio} />
                 </motion.div>
               )}
 
